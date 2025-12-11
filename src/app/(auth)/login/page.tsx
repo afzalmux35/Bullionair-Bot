@@ -11,7 +11,7 @@ import { initiateEmailSignIn, initiateEmailSignUp } from "@/firebase/non-blockin
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { User, onAuthStateChanged } from "firebase/auth";
+import { User, onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
 import { createInitialUserData } from "@/lib/firestore-data";
 
 export default function LoginPage() {
@@ -32,27 +32,18 @@ export default function LoginPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!auth || !firestore) return;
+    if (!auth) return;
 
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      if (user && user.metadata.creationTime === user.metadata.lastSignInTime) {
-        // This is a new user
-        try {
-          await createInitialUserData(firestore, user, signupFirstName, signupLastName);
-          toast({ title: "Welcome!", description: "Your account and trading profile have been created." });
-          router.push('/dashboard');
-        } catch (err: any) {
-          setError(err.message);
-          toast({ variant: "destructive", title: "Setup Failed", description: err.message });
-        }
-      } else if (user) {
-        // Existing user logged in
+    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+      if (user) {
+        // User is logged in, redirect to dashboard.
+        // The data creation is now handled in handleSignUp.
         router.push('/dashboard');
       }
     });
 
     return () => unsubscribe();
-  }, [auth, firestore, router, toast, signupFirstName, signupLastName]);
+  }, [auth, router]);
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -77,7 +68,7 @@ export default function LoginPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth) return;
+    if (!auth || !firestore) return;
     if (!signupFirstName || !signupLastName) {
       setError("First and Last name are required.");
       toast({ variant: "destructive", title: "Sign Up Failed", description: "First and Last name are required." });
@@ -86,8 +77,14 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      initiateEmailSignUp(auth, signupEmail, signupPassword);
-      // User data creation and redirection are handled by the onAuthStateChanged listener
+      const userCredential = await createUserWithEmailAndPassword(auth, signupEmail, signupPassword);
+      const newUser = userCredential.user;
+      
+      // Now that user is created, create their data in Firestore
+      await createInitialUserData(firestore, newUser, signupFirstName, signupLastName);
+      
+      toast({ title: "Welcome!", description: "Your account and trading profile have been created." });
+      // The onAuthStateChanged listener will handle the redirect
     } catch (err: any) {
       setError(err.message);
       toast({ variant: "destructive", title: "Sign Up Failed", description: err.message });
