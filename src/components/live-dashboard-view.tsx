@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   Card,
@@ -6,7 +6,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -14,17 +14,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { mockBotActivities, mockOpenTrade } from "@/lib/data";
-import { cn } from "@/lib/utils";
-import type { DailyGoal } from "@/lib/types";
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
+import type { DailyGoal, Trade } from '@/lib/types';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 
 import {
   TrendingUp,
-  TrendingDown,
   CircleDot,
   PauseCircle,
   Settings2,
@@ -32,19 +31,46 @@ import {
   DollarSign,
   BarChart2,
   CheckCircle2,
-  XCircle,
   Timer,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useMemoFirebase } from '@/firebase/provider';
+import type { BotActivity } from '@/lib/types';
 
 type LiveDashboardViewProps = {
   dailyGoal: DailyGoal;
   confirmationMessage: string;
   onPause: () => void;
+  tradingAccountId: string;
 };
 
-export function LiveDashboardView({ dailyGoal, onPause }: LiveDashboardViewProps) {
+export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: LiveDashboardViewProps) {
   const [currentTime, setCurrentTime] = useState('00:47');
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const tradesQuery = useMemoFirebase(() => {
+    if (!user || !tradingAccountId) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccountId, 'trades'),
+      orderBy('timestamp', 'desc')
+    );
+  }, [firestore, user, tradingAccountId]);
+
+  const { data: trades, isLoading: tradesLoading } = useCollection<Trade>(tradesQuery);
+  const openTrade = trades?.find(trade => trade.status === 'OPEN');
+
+  const botActivitiesQuery = useMemoFirebase(() => {
+    if (!user || !tradingAccountId) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccountId, 'botActivities'),
+      orderBy('timestamp', 'desc'),
+      limit(10)
+    );
+  }, [firestore, user, tradingAccountId]);
+
+  const { data: botActivities } = useCollection<BotActivity>(botActivitiesQuery);
 
   useEffect(() => {
     let seconds = 47;
@@ -56,29 +82,35 @@ export function LiveDashboardView({ dailyGoal, onPause }: LiveDashboardViewProps
     return () => clearInterval(timer);
   }, []);
 
-  const profit = 420;
-  const balance = 10420;
+  const closedTrades = trades?.filter(trade => trade.status !== 'OPEN') || [];
+  const profit = closedTrades.reduce((acc, trade) => acc + (trade.profit || 0), 0);
+  const wins = closedTrades.filter(trade => (trade.profit || 0) > 0).length;
+  const losses = closedTrades.length - wins;
+  const winRate = closedTrades.length > 0 ? (wins / closedTrades.length) * 100 : 0;
+
+  // Assuming starting balance comes from somewhere, for now, we'll estimate it.
+  const balance = 10000 + profit;
   const profitPercentage = dailyGoal.type === 'profit' ? (profit / dailyGoal.value) * 100 : 0;
 
   const statCards = [
     {
-      title: "Current Balance",
+      title: 'Current Balance',
       value: `$${balance.toLocaleString('en-US')}`,
       icon: <DollarSign className="h-4 w-4 text-muted-foreground" />,
     },
     {
       title: "Today's P/L",
-      value: `+$${profit.toLocaleString('en-US')}`,
+      value: `${profit >= 0 ? '+' : ''}$${profit.toLocaleString('en-US')}`,
       icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />,
     },
     {
-      title: "Win Rate",
-      value: "66.7%",
+      title: 'Win Rate',
+      value: `${winRate.toFixed(1)}%`,
       icon: <BarChart2 className="h-4 w-4 text-muted-foreground" />,
     },
     {
-      title: "Trades Today",
-      value: "3 (2W, 1L)",
+      title: 'Trades Today',
+      value: `${closedTrades.length} (${wins}W, ${losses}L)`,
       icon: <CheckCircle2 className="h-4 w-4 text-muted-foreground" />,
     },
   ];
@@ -133,9 +165,11 @@ export function LiveDashboardView({ dailyGoal, onPause }: LiveDashboardViewProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockBotActivities.slice(0, 9).map((activity) => (
-                    <TableRow key={activity.timestamp}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">{activity.timestamp}</TableCell>
+                  {botActivities?.map((activity) => (
+                    <TableRow key={activity.id}>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {new Date(activity.timestamp).toLocaleTimeString()}
+                      </TableCell>
                       <TableCell>{activity.message}</TableCell>
                     </TableRow>
                   ))}
@@ -172,40 +206,44 @@ export function LiveDashboardView({ dailyGoal, onPause }: LiveDashboardViewProps
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Open Trade</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/50 hover:bg-blue-500/30">⚡ {mockOpenTrade.type}</Badge>
-                <span className="font-semibold">{mockOpenTrade.lots} lots @ ${mockOpenTrade.price}</span>
+        {openTrade && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Open Trade</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/50 hover:bg-blue-500/30">⚡ {openTrade.type}</Badge>
+                  <span className="font-semibold">{openTrade.volume} lots @ ${openTrade.entryPrice}</span>
+                </div>
+                <span className={cn(
+                  "font-bold",
+                  (openTrade.profit || 0) > 0 ? "text-green-400" : "text-red-400"
+                )}>
+                  {(openTrade.profit || 0) > 0 ? '+' : ''}${openTrade.profit}
+                </span>
               </div>
-              <span className={cn(
-                "font-bold",
-                mockOpenTrade.pnl > 0 ? "text-green-400" : "text-red-400"
-              )}>
-                {mockOpenTrade.pnl > 0 ? '+' : ''}${mockOpenTrade.pnl}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                <div>
-                    <p className="text-muted-foreground">Risk</p>
-                    <p className="font-mono text-red-400">${mockOpenTrade.risk}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Stop Loss</p>
-                    <p className="font-mono">${mockOpenTrade.stopLoss}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Take Profit</p>
-                    <p className="font-mono text-green-400">${mockOpenTrade.takeProfit}</p>
-                </div>
-            </div>
-            <div className="text-xs text-muted-foreground text-center">Running: 15 min | Confidence: {mockOpenTrade.confidence}</div>
-          </CardContent>
-        </Card>
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                  <div>
+                      <p className="text-muted-foreground">Risk</p>
+                      <p className="font-mono text-red-400">$-{/* Risk calculation needed */}</p>
+                  </div>
+                   <div>
+                      <p className="text-muted-foreground">Stop Loss</p>
+                      <p className="font-mono">${openTrade.exitPrice /* Assuming exit price for now */}</p>
+                  </div>
+                  <div>
+                      <p className="text-muted-foreground">Take Profit</p>
+                      <p className="font-mono text-green-400">${openTrade.exitPrice /* Assuming exit price for now */}</p>
+                  </div>
+              </div>
+              <div className="text-xs text-muted-foreground text-center">
+                Running: 15 min | Confidence: {openTrade.confidenceLevel}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

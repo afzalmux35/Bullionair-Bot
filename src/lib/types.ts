@@ -1,21 +1,21 @@
 export type Trade = {
-  id: number;
-  type: 'BUY' | 'SELL';
-  lots: number;
-  price: number;
+  id: string;
+  tradingAccountId: string;
   timestamp: string;
+  symbol: string;
+  type: 'BUY' | 'SELL';
+  entryPrice: number;
+  exitPrice: number;
+  volume: number;
+  profit: number;
+  confidenceLevel: string;
   status: 'WON' | 'LOST' | 'OPEN';
-  profit?: number;
-  pnl?: number; // pnl for open trades
-  risk: number;
-  takeProfit: number;
-  stopLoss: number;
-  confidence: 'High' | 'Moderate' | 'Low';
 };
 
 export type DailySummary = {
   startingBalance: number;
   endingBalance: number;
+  currentBalance: number;
   tradesTaken: number;
   winningTrades: number;
   totalProfit: number;
@@ -24,6 +24,7 @@ export type DailySummary = {
 };
 
 export type BotActivity = {
+  id: string;
   timestamp: string;
   message: string;
   type: 'ANALYSIS' | 'SIGNAL' | 'RESULT' | 'UPDATE' | 'SUMMARY';
@@ -32,4 +33,24 @@ export type BotActivity = {
 export type DailyGoal = {
   type: 'profit' | 'risk';
   value: number;
-}
+};
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  referralCode?: string;
+  referredById?: string;
+};
+
+export type TradingAccount = {
+  id: string;
+  userProfileId: string;
+  startingBalance: number;
+  currentBalance: number;
+  dailyRiskLimit: number;
+  dailyProfitTarget: number;
+  maxPositionSize: number;
+  autoTradingActive: boolean;
+};

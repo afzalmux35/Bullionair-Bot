@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { initiateEmailSignIn, initiateEmailSignUp } from "@/firebase/non-blocking-login";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { User, onAuthStateChanged } from "firebase/auth";
+import { createInitialUserData } from "@/lib/firestore-data";
 
 export default function LoginPage() {
   const [loginEmail, setLoginEmail] = useState('');
@@ -24,9 +26,33 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!auth || !firestore) return;
+
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+      if (user && user.metadata.creationTime === user.metadata.lastSignInTime) {
+        // This is a new user
+        try {
+          await createInitialUserData(firestore, user, signupFirstName, signupLastName);
+          toast({ title: "Welcome!", description: "Your account and trading profile have been created." });
+          router.push('/dashboard');
+        } catch (err: any) {
+          setError(err.message);
+          toast({ variant: "destructive", title: "Setup Failed", description: err.message });
+        }
+      } else if (user) {
+        // Existing user logged in
+        router.push('/dashboard');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth, firestore, router, toast, signupFirstName, signupLastName]);
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -36,11 +62,12 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) return;
     setLoading(true);
     setError(null);
     try {
       initiateEmailSignIn(auth, loginEmail, loginPassword);
-      toast({ title: "Login successful!", description: "Redirecting to your dashboard." });
+      // Redirection is handled by the onAuthStateChanged listener
     } catch (err: any) {
       setError(err.message);
       toast({ variant: "destructive", title: "Login Failed", description: err.message });
@@ -50,12 +77,17 @@ export default function LoginPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) return;
+    if (!signupFirstName || !signupLastName) {
+      setError("First and Last name are required.");
+      toast({ variant: "destructive", title: "Sign Up Failed", description: "First and Last name are required." });
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       initiateEmailSignUp(auth, signupEmail, signupPassword);
-      toast({ title: "Sign up successful!", description: "Redirecting to your dashboard." });
-      // Here you would typically also create a user profile in Firestore
+      // User data creation and redirection are handled by the onAuthStateChanged listener
     } catch (err: any) {
       setError(err.message);
       toast({ variant: "destructive", title: "Sign Up Failed", description: err.message });
