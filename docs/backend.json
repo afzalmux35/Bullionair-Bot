@@ -1,0 +1,351 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile in the Bullionaire Bot application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the user."
+        },
+        "subscriptionId": {
+          "type": "string",
+          "description": "Reference to SubscriptionPlan. (Relationship: SubscriptionPlan 1:1 UserProfile)"
+        },
+        "referralCode": {
+          "type": "string",
+          "description": "Unique referral code for the user."
+        },
+        "referredById": {
+          "type": "string",
+          "description": "Reference to UserProfile who referred this user. (Relationship: UserProfile 1:N UserProfile (Self-Referential))"
+        },
+        "accuracyBoostUntil": {
+          "type": "string",
+          "description": "Timestamp until the accuracy boost from referral lasts.",
+          "format": "date-time"
+        },
+        "virtualBalance": {
+          "type": "number",
+          "description": "Virtual money balance for demo trading."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "firstName",
+        "lastName"
+      ]
+    },
+    "TradingAccount": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TradingAccount",
+      "type": "object",
+      "description": "Represents a user's trading account and its associated settings.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the trading account."
+        },
+        "userProfileId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N TradingAccount)"
+        },
+        "startingBalance": {
+          "type": "number",
+          "description": "Initial balance of the trading account."
+        },
+        "currentBalance": {
+          "type": "number",
+          "description": "Current balance of the trading account."
+        },
+        "dailyRiskLimit": {
+          "type": "number",
+          "description": "Maximum risk allowed per day for automated trading."
+        },
+        "dailyProfitTarget": {
+          "type": "number",
+          "description": "Target profit to achieve per day for automated trading."
+        },
+        "maxPositionSize": {
+          "type": "number",
+          "description": "Maximum position size allowed for a single trade."
+        },
+        "autoTradingActive": {
+          "type": "boolean",
+          "description": "Indicates whether automated trading is currently active."
+        }
+      },
+      "required": [
+        "id",
+        "userProfileId",
+        "startingBalance",
+        "currentBalance"
+      ]
+    },
+    "Trade": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Trade",
+      "type": "object",
+      "description": "Represents a single trade executed by the trading engine.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the trade."
+        },
+        "tradingAccountId": {
+          "type": "string",
+          "description": "Reference to TradingAccount. (Relationship: TradingAccount 1:N Trade)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the trade was executed.",
+          "format": "date-time"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Trading symbol (e.g., XAUUSD for Gold)."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of trade (BUY or SELL)."
+        },
+        "entryPrice": {
+          "type": "number",
+          "description": "Price at which the trade was entered."
+        },
+        "exitPrice": {
+          "type": "number",
+          "description": "Price at which the trade was exited."
+        },
+        "volume": {
+          "type": "number",
+          "description": "Volume of the trade (e.g., 0.2 lots)."
+        },
+        "profit": {
+          "type": "number",
+          "description": "Profit or loss of the trade."
+        },
+        "confidenceLevel": {
+          "type": "string",
+          "description": "Confidence level of the trading signal that triggered the trade (e.g., Strong, Moderate)."
+        }
+      },
+      "required": [
+        "id",
+        "tradingAccountId",
+        "timestamp",
+        "symbol",
+        "type",
+        "entryPrice",
+        "exitPrice",
+        "volume",
+        "profit"
+      ]
+    },
+    "SubscriptionPlan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SubscriptionPlan",
+      "type": "object",
+      "description": "Represents a subscription plan with its features and pricing.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the subscription plan."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the subscription plan (e.g., Basic, Pro, Institutional)."
+        },
+        "price": {
+          "type": "number",
+          "description": "Monthly price of the subscription plan."
+        },
+        "tradeLimit": {
+          "type": "number",
+          "description": "Maximum number of auto-trades allowed per day (-1 for unlimited)."
+        },
+        "accuracyTarget": {
+          "type": "number",
+          "description": "Target accuracy percentage for the trading engine."
+        },
+        "features": {
+          "type": "array",
+          "description": "Array of features included in the subscription plan.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "price",
+        "tradeLimit",
+        "accuracyTarget"
+      ]
+    },
+    "DailyRecommendation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyRecommendation",
+      "type": "object",
+      "description": "Represents the AI-driven recommendation for position sizes for the next day.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the daily recommendation."
+        },
+        "tradingAccountId": {
+          "type": "string",
+          "description": "Reference to TradingAccount. (Relationship: TradingAccount 1:N DailyRecommendation)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date for which the recommendation is generated.",
+          "format": "date-time"
+        },
+        "recommendedPositionSize": {
+          "type": "number",
+          "description": "Recommended position size for the next day."
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "Reasoning behind the recommendation based on market volatility."
+        }
+      },
+      "required": [
+        "id",
+        "tradingAccountId",
+        "date",
+        "recommendedPositionSize",
+        "reasoning"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profiles. The `userId` path segment corresponds to the Firebase Authentication UID. This enables path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication UID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tradingAccounts/{tradingAccountId}",
+        "definition": {
+          "entityName": "TradingAccount",
+          "schema": {
+            "$ref": "#/backend/entities/TradingAccount"
+          },
+          "description": "Stores trading accounts for each user. Each user can have multiple trading accounts.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication UID of the user."
+            },
+            {
+              "name": "tradingAccountId",
+              "description": "The unique identifier for the trading account."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tradingAccounts/{tradingAccountId}/trades/{tradeId}",
+        "definition": {
+          "entityName": "Trade",
+          "schema": {
+            "$ref": "#/backend/entities/Trade"
+          },
+          "description": "Stores individual trade records for a specific trading account.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication UID of the user."
+            },
+            {
+              "name": "tradingAccountId",
+              "description": "The unique identifier for the trading account."
+            },
+            {
+              "name": "tradeId",
+              "description": "The unique identifier for the trade."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tradingAccounts/{tradingAccountId}/dailyRecommendations/{dailyRecommendationId}",
+        "definition": {
+          "entityName": "DailyRecommendation",
+          "schema": {
+            "$ref": "#/backend/entities/DailyRecommendation"
+          },
+          "description": "Stores AI-driven daily recommendations for a specific trading account.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication UID of the user."
+            },
+            {
+              "name": "tradingAccountId",
+              "description": "The unique identifier for the trading account."
+            },
+            {
+              "name": "dailyRecommendationId",
+              "description": "The unique identifier for the daily recommendation."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/subscriptionPlans/{subscriptionPlanId}",
+        "definition": {
+          "entityName": "SubscriptionPlan",
+          "schema": {
+            "$ref": "#/backend/entities/SubscriptionPlan"
+          },
+          "description": "Stores subscription plan details. Access is controlled based on user roles (e.g., admin).",
+          "params": [
+            {
+              "name": "subscriptionPlanId",
+              "description": "The unique identifier for the subscription plan."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure security, scalability, and ease of debugging, adhering to the principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs. Authorization independence is achieved through denormalization of authorization data. \n\n- User Profiles are stored under `/users/{userId}`, providing path-based ownership for private user data.\n- Trading Accounts are stored under `/users/{userId}/tradingAccounts/{tradingAccountId}` to represent the `User 1:N TradingAccount` relationship. This allows to define simple ownership based rules.\n- Trades are nested under Trading Accounts at `/users/{userId}/tradingAccounts/{tradingAccountId}/trades/{tradeId}`, continuing the hierarchical structure for `TradingAccount 1:N Trade` relationship.\n- Daily Recommendations are also nested under Trading Accounts at `/users/{userId}/tradingAccounts/{tradingAccountId}/dailyRecommendations/{dailyRecommendationId}`.\n- Subscription plans are stored at the root level under `/subscriptionPlans/{subscriptionPlanId}` as they are global and not user-specific. Access to this collection is managed by rules that may depend on the user's role (e.g., admin). This enables listing of plans without requiring filtering in rules.\n\nThe structure supports QAPs by segregating data based on ownership and access needs (e.g., user profiles are separate from subscription plans), and avoids using rules as filters. The user's `uid` from `request.auth` is the single source of truth and no custom claims are used."
+  }
+}
