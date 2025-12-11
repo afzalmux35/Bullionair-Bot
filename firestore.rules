@@ -17,10 +17,6 @@
  * Key Security Decisions:
  * - Strict Ownership: A user can only access data located under their own
  *   /users/{userId} path. All other access is denied.
- * - Limited User Listing for Leaderboard: Users can list documents from the /users
- *   collection but can only read specific, non-sensitive fields required for the
- *   leaderboard (id, firstName, lastName, referredById). This is a temporary measure for the
- *   prototype; a production app should use a separate, aggregated leaderboard collection.
  * - Public Data Segregation: Globally accessible data like subscription plans
  *   is stored in a separate top-level collection.
  * - Denormalization for Authorization: Path-based security is used for performance.
@@ -75,10 +71,8 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isOwner(userId);
-      // Allow authenticated users to list specific fields for leaderboard/referral functionality.
-      // In a production app, this should be replaced with a more secure backend-managed collection.
-      allow list: if isSignedIn() && 
-                     request.query.keys.hasOnly(['id', 'firstName', 'lastName', 'referredById']);
+      // Deny list access for security. A backend function should be used for features like leaderboards.
+      allow list: if false;
       allow create: if isOwner(userId) && isNewUserProfileValid(userId);
       allow update: if isExistingOwner(userId) && isUserProfileIdImmutable();
       allow delete: if isExistingOwner(userId);

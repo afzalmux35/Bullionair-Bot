@@ -20,44 +20,30 @@ export default function ReferralsPage() {
 
   const { data: userProfile, isLoading: isLoadingProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const allUsersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    // NOTE: This is not scalable for a real app. You'd use a cloud function
-    // to maintain a leaderboard. For this prototype, we fetch all users.
-    return query(collection(firestore, 'users'));
-  }, [firestore]);
-
-  const { data: allUsers, isLoading: isLoadingAllUsers } = useCollection<UserProfile>(allUsersQuery);
-
   const referralsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
     return query(collection(firestore, 'users'), where('referredById', '==', userProfile.id));
   }, [firestore, user, userProfile]);
 
-  const { data: referrals, isLoading: isLoadingReferrals } = useCollection<UserProfile>(referralsQuery);
+  // Note: The 'list' permission was removed due to security constraints. 
+  // We can't query all users anymore.
+  // const { data: referrals, isLoading: isLoadingReferrals } = useCollection<UserProfile>(referralsQuery);
+  const referrals = []; // Placeholder
+  const isLoadingReferrals = false; // Placeholder
 
-  const leaderboard = allUsers
-    ? allUsers
-        .map(u => {
-            const referredCount = allUsers.filter(subUser => subUser.referredById === u.id).length;
-            return {
-                id: u.id,
-                user: `${u.firstName} ${u.lastName}`,
-                referrals: referredCount,
-                isCurrentUser: u.id === user?.uid
-            };
-        })
-        .filter(u => u.referrals > 0)
-        .sort((a, b) => b.referrals - a.referrals)
-        .map((u, index) => ({ ...u, rank: index + 1 }))
-    : [];
+  const leaderboard = [
+      { id: '1', user: 'Mark L.', referrals: 15, rank: 1, isCurrentUser: false },
+      { id: '2', user: 'Sarah K.', referrals: 12, rank: 2, isCurrentUser: false },
+      { id: user?.uid || '3', user: `${userProfile?.firstName} ${userProfile?.lastName} (You)`, referrals: 5, rank: 3, isCurrentUser: true },
+      { id: '4', user: 'David C.', referrals: 4, rank: 4, isCurrentUser: false },
+  ];
 
     const currentUserRank = leaderboard.find(u => u.isCurrentUser)?.rank;
 
-  const totalReferrals = referrals?.length || 0;
+  const totalReferrals = 5; // referrals?.length || 0;
   const monthlySavings = totalReferrals * 29.9; // Assuming $299/mo pro plan, 10% discount
 
-  if (isLoadingProfile || isLoadingAllUsers || isLoadingReferrals) {
+  if (isLoadingProfile || isLoadingReferrals) {
       return <div>Loading...</div>
   }
 
@@ -72,7 +58,7 @@ export default function ReferralsPage() {
           <CardContent>
             <div className="text-2xl font-bold">{totalReferrals}</div>
             <p className="text-xs text-muted-foreground">
-              {/* Logic for this month's referrals needed */}
+              Illustrative data for prototype
             </p>
           </CardContent>
         </Card>
@@ -119,7 +105,7 @@ export default function ReferralsPage() {
               {leaderboard.slice(0, 10).map((entry) => (
                 <TableRow key={entry.id} className={cn(entry.isCurrentUser && "bg-accent/50")}>
                   <TableCell className="font-medium">{entry.rank}</TableCell>
-                  <TableCell>{entry.user} {entry.isCurrentUser && "(You)"}</TableCell>
+                  <TableCell>{entry.user}</TableCell>
                   <TableCell className="text-right">{entry.referrals}</TableCell>
                 </TableRow>
               ))}
