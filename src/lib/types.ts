@@ -1,5 +1,6 @@
 'use client';
 
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 export const TradeSchema = z.object({
@@ -9,13 +10,13 @@ export const TradeSchema = z.object({
   symbol: z.string(),
   type: z.enum(['BUY', 'SELL']),
   entryPrice: z.number(),
-  exitPrice: z.number().optional(),
+  exitPrice: z.number().optional().nullable(),
   volume: z.number(),
-  profit: z.number(),
+  profit: z.number().optional().nullable(),
   confidenceLevel: z.string(),
   status: z.enum(['WON', 'LOST', 'OPEN']),
-  stopLoss: z.number().optional(),
-  takeProfit: z.number().optional(),
+  stopLoss: z.number().optional().nullable(),
+  takeProfit: z.number().optional().nullable(),
 });
 export type Trade = z.infer<typeof TradeSchema>;
 
@@ -33,6 +34,16 @@ export const TradingDecisionInputSchema = z.object({
   }),
 });
 export type TradingDecisionInput = z.infer<typeof TradingDecisionInputSchema>;
+
+export const TradingDecisionPromptInputSchema = TradingDecisionInputSchema.extend({
+    marketData: ai.defineSchema('marketData', {
+        price: 'number',
+        trend: 'string',
+    }),
+    currentTime: z.string(),
+});
+export type TradingDecisionPromptInput = z.infer<typeof TradingDecisionPromptInputSchema>;
+
 
 export const TradingDecisionOutputSchema = z.object({
   decision: z.enum(['OPEN_BUY', 'OPEN_SELL', 'CLOSE', 'WAIT']),

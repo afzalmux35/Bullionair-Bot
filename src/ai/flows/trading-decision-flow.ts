@@ -7,19 +7,13 @@
 
 import { ai } from '@/ai/genkit';
 import { getMarketData } from '@/lib/brokerage-service';
-import { TradingDecisionInputSchema, TradingDecisionOutputSchema } from '@/lib/types';
+import { TradingDecisionInputSchema, TradingDecisionOutputSchema, TradingDecisionPromptInputSchema } from '@/lib/types';
 import type { TradingDecisionInput, TradingDecisionOutput } from '@/lib/types';
 
 
 const decisionPrompt = ai.definePrompt({
     name: 'tradingDecisionPrompt',
-    input: { schema: TradingDecisionInputSchema.extend({
-        marketData: ai.defineSchema('marketData', {
-            price: 'number',
-            trend: 'string',
-        }),
-        currentTime: 'string',
-    }) },
+    input: { schema: TradingDecisionPromptInputSchema },
     output: { schema: TradingDecisionOutputSchema },
     prompt: `You are an expert AI trading bot for Gold (XAUUSD). It is currently {{currentTime}}.
 
