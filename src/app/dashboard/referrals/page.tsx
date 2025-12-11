@@ -7,7 +7,8 @@ import { useMemoFirebase } from "@/firebase/provider";
 import type { UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { collection, doc, query, where } from "firebase/firestore";
-import { Award, Gift, Users } from "lucide-react";
+import { Award, Gift, Users, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ReferralsPage() {
   const { user } = useUser();
@@ -20,28 +21,14 @@ export default function ReferralsPage() {
 
   const { data: userProfile, isLoading: isLoadingProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const referralsQuery = useMemoFirebase(() => {
-    if (!user || !userProfile) return null;
-    return query(collection(firestore, 'users'), where('referredById', '==', userProfile.id));
-  }, [firestore, user, userProfile]);
+  // The query for referrals is disabled because Firestore security rules
+  // prevent querying the entire 'users' collection for security reasons.
+  // A production implementation would use a backend function.
+  const referrals = []; 
+  const isLoadingReferrals = false;
 
-  // Note: The 'list' permission was removed due to security constraints. 
-  // We can't query all users anymore.
-  // const { data: referrals, isLoading: isLoadingReferrals } = useCollection<UserProfile>(referralsQuery);
-  const referrals = []; // Placeholder
-  const isLoadingReferrals = false; // Placeholder
-
-  const leaderboard = [
-      { id: '1', user: 'Mark L.', referrals: 15, rank: 1, isCurrentUser: false },
-      { id: '2', user: 'Sarah K.', referrals: 12, rank: 2, isCurrentUser: false },
-      { id: user?.uid || '3', user: `${userProfile?.firstName} ${userProfile?.lastName} (You)`, referrals: 5, rank: 3, isCurrentUser: true },
-      { id: '4', user: 'David C.', referrals: 4, rank: 4, isCurrentUser: false },
-  ];
-
-    const currentUserRank = leaderboard.find(u => u.isCurrentUser)?.rank;
-
-  const totalReferrals = 5; // referrals?.length || 0;
-  const monthlySavings = totalReferrals * 29.9; // Assuming $299/mo pro plan, 10% discount
+  const totalReferrals = referrals?.length || 0;
+  const monthlySavings = totalReferrals * 29.9; 
 
   if (isLoadingProfile || isLoadingReferrals) {
       return <div>Loading...</div>
@@ -58,7 +45,7 @@ export default function ReferralsPage() {
           <CardContent>
             <div className="text-2xl font-bold">{totalReferrals}</div>
             <p className="text-xs text-muted-foreground">
-              Illustrative data for prototype
+              Number of users you've referred.
             </p>
           </CardContent>
         </Card>
@@ -70,7 +57,7 @@ export default function ReferralsPage() {
           <CardContent>
             <div className="text-2xl font-bold">${monthlySavings.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              {totalReferrals * 10}% off your Pro plan
+              {totalReferrals * 20}% off your Pro plan
             </p>
           </CardContent>
         </Card>
@@ -80,39 +67,33 @@ export default function ReferralsPage() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentUserRank ? `#${currentUserRank}`: 'N/A'}</div>
+            <div className="text-2xl font-bold">N/A</div>
             <p className="text-xs text-muted-foreground">
-              out of {leaderboard.length} users
+              Leaderboard is a backend feature.
             </p>
           </CardContent>
         </Card>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Referral Leaderboard</CardTitle>
-          <CardDescription>See how you stack up against other traders. Your referral code: <span className="font-mono text-primary">{userProfile?.referralCode}</span></CardDescription>
+          <CardTitle>Your Referral Code</CardTitle>
+          <CardDescription>Share your code with friends. They get 10% off their first month, and you get 20% off your next bill for each one!</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">Rank</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead className="text-right">Referrals</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leaderboard.slice(0, 10).map((entry) => (
-                <TableRow key={entry.id} className={cn(entry.isCurrentUser && "bg-accent/50")}>
-                  <TableCell className="font-medium">{entry.rank}</TableCell>
-                  <TableCell>{entry.user}</TableCell>
-                  <TableCell className="text-right">{entry.referrals}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+            <div className="flex items-center space-x-2">
+                <p className="text-2xl font-mono text-primary bg-muted p-4 rounded-lg">
+                    {userProfile?.referralCode || 'Loading...'}
+                </p>
+            </div>
         </CardContent>
       </Card>
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Leaderboard Coming Soon</AlertTitle>
+        <AlertDescription>
+            A full referral leaderboard requires a secure backend process to aggregate user data without compromising privacy. This feature is planned for a future update. For now, you can track your total referrals and savings above.
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

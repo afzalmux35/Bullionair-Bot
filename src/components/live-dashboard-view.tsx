@@ -271,20 +271,6 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
                   {/* Realtime P/L would go here */}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                  <div>
-                      <p className="text-muted-foreground">Risk</p>
-                      <p className="font-mono text-red-400">$-{((openTrade.entryPrice - (openTrade.entryPrice * 0.995)) * openTrade.volume * 100).toFixed(2)}</p>
-                  </div>
-                   <div>
-                      <p className="text-muted-foreground">Stop Loss</p>
-                      <p className="font-mono">${(openTrade.entryPrice * 0.995).toFixed(2)}</p>
-                  </div>
-                  <div>
-                      <p className="text-muted-foreground">Take Profit</p>
-                      <p className="font-mono text-green-400">${(openTrade.entryPrice * 1.01).toFixed(2)}</p>
-                  </div>
-              </div>
               <div className="text-xs text-muted-foreground text-center">
                 Running: {Math.floor((new Date().getTime() - new Date(openTrade.timestamp).getTime()) / 60000)} min | Confidence: {openTrade.confidenceLevel}
               </div>
