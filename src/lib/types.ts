@@ -1,16 +1,48 @@
-export type Trade = {
-  id: string;
-  tradingAccountId: string;
-  timestamp: string;
-  symbol: string;
-  type: 'BUY' | 'SELL';
-  entryPrice: number;
-  exitPrice?: number;
-  volume: number;
-  profit: number;
-  confidenceLevel: string;
-  status: 'WON' | 'LOST' | 'OPEN';
-};
+import { z } from 'zod';
+
+export const TradeSchema = z.object({
+  id: z.string(),
+  tradingAccountId: z.string(),
+  timestamp: z.string(),
+  symbol: z.string(),
+  type: z.enum(['BUY', 'SELL']),
+  entryPrice: z.number(),
+  exitPrice: z.number().optional(),
+  volume: z.number(),
+  profit: z.number(),
+  confidenceLevel: z.string(),
+  status: z.enum(['WON', 'LOST', 'OPEN']),
+});
+export type Trade = z.infer<typeof TradeSchema>;
+
+
+export const TradingDecisionInputSchema = z.object({
+  tradingAccountId: z.string(),
+  user: z.object({
+    uid: z.string(),
+  }),
+  openTrade: TradeSchema.optional().nullable(),
+  account: z.object({
+    currentBalance: z.number(),
+    dailyProfitTarget: z.number(),
+    dailyRiskLimit: z.number(),
+  }),
+});
+export type TradingDecisionInput = z.infer<typeof TradingDecisionInputSchema>;
+
+export const TradingDecisionOutputSchema = z.object({
+  decision: z.enum(['OPEN_BUY', 'OPEN_SELL', 'CLOSE', 'WAIT']),
+  reasoning: z.string().describe('Detailed reasoning for the trading decision.'),
+  tradeDetails: z
+    .object({
+      symbol: z.string().optional(),
+      volume: z.number().optional(),
+      confidenceLevel: z.string().optional(),
+    })
+    .optional(),
+});
+export type TradingDecisionOutput = z.infer<typeof TradingDecisionOutputSchema>;
+
 
 export type DailySummary = {
   startingBalance: number;

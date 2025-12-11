@@ -3,62 +3,22 @@
  * @fileOverview The core AI trading brain. Decides whether to open, close, or hold a position.
  *
  * - tradingDecisionFlow - The main flow that makes the trading decision.
- * - TradingDecisionInput - The input schema for the flow.
- * - TradingDecisionOutput - The output schema for the flow.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
 import { getMarketData } from '@/lib/brokerage-service';
-
-// Schemas
-const TradeSchema = z.object({
-    id: z.string(),
-    tradingAccountId: z.string(),
-    timestamp: z.string(),
-    symbol: z.string(),
-    type: z.enum(['BUY', 'SELL']),
-    entryPrice: z.number(),
-    volume: z.number(),
-    status: z.enum(['OPEN', 'WON', 'LOST']),
-    profit: z.number().optional(),
-    exitPrice: z.number().optional(),
-    confidenceLevel: z.string(),
-});
-
-export const TradingDecisionInputSchema = z.object({
-  tradingAccountId: z.string(),
-  user: z.object({
-    uid: z.string(),
-  }),
-  openTrade: TradeSchema.optional().nullable(),
-  account: z.object({
-    currentBalance: z.number(),
-    dailyProfitTarget: z.number(),
-    dailyRiskLimit: z.number(),
-  }),
-});
-export type TradingDecisionInput = z.infer<typeof TradingDecisionInputSchema>;
-
-export const TradingDecisionOutputSchema = z.object({
-  decision: z.enum(['OPEN_BUY', 'OPEN_SELL', 'CLOSE', 'WAIT']),
-  reasoning: z.string().describe('Detailed reasoning for the trading decision.'),
-  tradeDetails: z.object({
-      symbol: z.string().optional(),
-      volume: z.number().optional(),
-      confidenceLevel: z.string().optional(),
-    }).optional(),
-});
-export type TradingDecisionOutput = z.infer<typeof TradingDecisionOutputSchema>;
+import { TradingDecisionInputSchema, TradingDecisionOutputSchema, TradeSchema } from '@/lib/types';
+import type { TradingDecisionInput, TradingDecisionOutput } from '@/lib/types';
 
 
 const decisionPrompt = ai.definePrompt({
     name: 'tradingDecisionPrompt',
-    input: { schema: z.object({
-        marketData: z.any(),
-        openTrade: TradeSchema.optional().nullable(),
-        account: z.any(),
-        currentTime: z.string(),
+    input: { schema: TradingDecisionInputSchema.extend({
+        marketData: ai.defineSchema('marketData', {
+            price: 'number',
+            trend: 'string',
+        }),
+        currentTime: 'string',
     }) },
     output: { schema: TradingDecisionOutputSchema },
     prompt: `You are an expert AI trading bot for Gold (XAUUSD). It is currently {{currentTime}}.
@@ -91,7 +51,7 @@ export const tradingDecisionFlow = ai.defineFlow(
     inputSchema: TradingDecisionInputSchema,
     outputSchema: TradingDecisionOutputSchema,
   },
-  async (input) => {
+  async (input): Promise<TradingDecisionOutput> => {
     const marketData = await getMarketData();
 
     let openTradeWithContext = null;
@@ -109,6 +69,7 @@ export const tradingDecisionFlow = ai.defineFlow(
     const todaysPnL = 0; // Simplified for now
 
     const { output } = await decisionPrompt({
+      ...input,
       marketData,
       openTrade: openTradeWithContext,
       account: { ...input.account, todaysPnL },

@@ -5,15 +5,17 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { tradingDecisionFlow, TradingDecisionInputSchema, TradingDecisionOutputSchema } from './trading-decision-flow';
-import { Firestore, collection, doc } from 'firebase/firestore';
+import { tradingDecisionFlow } from './trading-decision-flow';
+import type { TradingDecisionInput } from '@/lib/types';
+import { Firestore, collection, doc, addDoc } from 'firebase/firestore';
 import { getMarketData, placeTrade, closeTrade } from '@/lib/brokerage-service';
-import { getSdks } from '@/firebase';
+import { getSdks, addDocumentNonBlocking } from '@/firebase';
+import { z } from 'zod';
 
 async function logActivity(firestore: Firestore, tradingAccountId: string, userId: string, message: string, type: 'ANALYSIS' | 'SIGNAL' | 'RESULT' | 'UPDATE' = 'ANALYSIS') {
     const activitiesCollection = collection(firestore, 'users', userId, 'tradingAccounts', tradingAccountId, 'botActivities');
     const activityRef = doc(activitiesCollection);
-    await addDocumentNonBlocking(activitiesCollection, {
+    addDocumentNonBlocking(activitiesCollection, {
         id: activityRef.id,
         message,
         timestamp: new Date().toISOString(),
@@ -25,10 +27,10 @@ async function logActivity(firestore: Firestore, tradingAccountId: string, userI
 export const runTradingCycleFlow = ai.defineFlow(
   {
     name: 'runTradingCycleFlow',
-    inputSchema: TradingDecisionInputSchema,
+    inputSchema: z.any(),
     outputSchema: z.void(),
   },
-  async (input) => {
+  async (input: TradingDecisionInput) => {
     const { firestore } = getSdks();
     const { tradingAccountId, user, openTrade } = input;
     
