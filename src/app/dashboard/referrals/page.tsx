@@ -6,7 +6,7 @@ import { useCollection, useDoc, useFirestore, useUser } from "@/firebase";
 import { useMemoFirebase } from "@/firebase/provider";
 import type { UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { collection, doc, query } from "firebase/firestore";
+import { collection, doc, query, where } from "firebase/firestore";
 import { Award, Gift, Users } from "lucide-react";
 
 export default function ReferralsPage() {
@@ -30,7 +30,7 @@ export default function ReferralsPage() {
   const { data: allUsers, isLoading: isLoadingAllUsers } = useCollection<UserProfile>(allUsersQuery);
 
   const referralsQuery = useMemoFirebase(() => {
-    if (!user || !userProfile?.referralCode) return null;
+    if (!user || !userProfile) return null;
     return query(collection(firestore, 'users'), where('referredById', '==', userProfile.id));
   }, [firestore, user, userProfile]);
 

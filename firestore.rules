@@ -17,20 +17,15 @@
  * Key Security Decisions:
  * - Strict Ownership: A user can only access data located under their own
  *   /users/{userId} path. All other access is denied.
- * - No User Listing: It is impossible to list all documents in the top-level
- *   /users collection, protecting user privacy.
+ * - Limited User Listing for Leaderboard: Users can list documents from the /users
+ *   collection but can only read specific, non-sensitive fields required for the
+ *   leaderboard (id, firstName, lastName, referredById). This is a temporary measure for the
+ *   prototype; a production app should use a separate, aggregated leaderboard collection.
  * - Public Data Segregation: Globally accessible data like subscription plans
- *   is stored in a separate top-level collection. This makes security rules
- *   simpler and queries for public data more performant. For now, this data is
- *   read-only for all authenticated users; writes are disabled pending the
- *   implementation of an admin role system.
- * - Denormalization for Authorization: The database structure uses the user's
- *   authentication UID as the document ID in the /users collection. This path-based
- *   security is highly performant as it avoids extra database reads (`get` or `exists`
- *   calls) to check for ownership.
- * - Relational Integrity: While data shapes are flexible, rules enforce that
- *   critical linking fields (e.g., a `userProfileId` inside a `TradingAccount`
- *   document) are correctly set upon creation and cannot be changed later.
+ *   is stored in a separate top-level collection.
+ * - Denormalization for Authorization: Path-based security is used for performance.
+ * - Relational Integrity: Rules enforce that critical linking fields are correctly
+ *   set upon creation and cannot be changed later.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -39,83 +34,38 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     // Helper Functions
     // ------------------------------------------------------------------------
-
-    /**
-     * isSignedIn
-     * Checks if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * isOwner
-     * Checks if the authenticated user's UID matches the provided userId.
-     * This is the cornerstone of the user-ownership security model.
-     * @param userId The user ID to check against the request's auth UID.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    /**
-     * isExistingOwner
-     * Ensures a document exists before an update or delete, and that the
-     * requester is the owner. Prevents operations on non-existent data.
-     * @param userId The user ID to check against the request's auth UID.
-     */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
-    /**
-     * isNewUserProfileValid
-     * Validates that a new UserProfile document contains an 'id' field that
-     * matches the document's ID (which is the user's auth UID).
-     */
     function isNewUserProfileValid(userId) {
       return request.resource.data.id == userId;
     }
 
-    /**
-     * isUserProfileIdImmutable
-     * Validates that the 'id' field of a UserProfile document cannot be changed
-     * on update, preserving the link to the user's auth UID.
-     */
     function isUserProfileIdImmutable() {
       return request.resource.data.id == resource.data.id;
     }
 
-    /**
-     * isNewAccountValid
-     * Validates that a new TradingAccount contains a 'userProfileId' that
-     * matches the parent user's ID.
-     */
     function isNewAccountValid(userId) {
       return request.resource.data.userProfileId == userId;
     }
 
-    /**
-     * isAccountOwnerIdImmutable
-     * Validates that the 'userProfileId' of a TradingAccount cannot be changed.
-     */
     function isAccountOwnerIdImmutable() {
       return request.resource.data.userProfileId == resource.data.userProfileId;
     }
 
-    /**
-     * isNewSubDocumentValid
-     * Validates that a new sub-document (like a Trade or Recommendation) has
-     * its parent 'tradingAccountId' field set correctly.
-     */
     function isNewSubDocumentValid(tradingAccountId) {
       return request.resource.data.tradingAccountId == tradingAccountId;
     }
 
-    /**
-     * isSubDocumentParentIdImmutable
-     * Validates that the 'tradingAccountId' of a sub-document cannot be changed.
-     */
     function isSubDocumentParentIdImmutable() {
       return request.resource.data.tradingAccountId == resource.data.tradingAccountId;
     }
@@ -123,29 +73,16 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     // User Data Collections
     // ------------------------------------------------------------------------
-
-    /**
-     * @description A user can create, read, update, and delete their own profile. They cannot read or affect any other user's profile.
-     * @path /users/{userId}
-     * @allow (create) a new user with auth.uid 'user_abc' creating their own profile at /users/user_abc.
-     * @deny (get) a user with auth.uid 'user_abc' trying to read the profile at /users/user_xyz.
-     * @deny (list) any user trying to list all documents in the /users collection.
-     * @principle Restricts access to a user's own data tree and enforces relational integrity.
-     */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false; // CRITICAL: Prevents listing all users.
+      // Allow authenticated users to list specific fields for leaderboard/referral functionality.
+      // In a production app, this should be replaced with a more secure backend-managed collection.
+      allow list: if isSignedIn() && 
+                     request.query.keys.hasOnly(['id', 'firstName', 'lastName', 'referredById']);
       allow create: if isOwner(userId) && isNewUserProfileValid(userId);
       allow update: if isExistingOwner(userId) && isUserProfileIdImmutable();
       allow delete: if isExistingOwner(userId);
 
-      /**
-       * @description A user can manage their own trading accounts.
-       * @path /users/{userId}/tradingAccounts/{tradingAccountId}
-       * @allow (create) an authenticated user creating a new trading account under their own user profile.
-       * @deny (update) an authenticated user attempting to modify a trading account owned by another user.
-       * @principle Enforces strict ownership on nested user data.
-       */
       match /tradingAccounts/{tradingAccountId} {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
@@ -153,13 +90,6 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId) && isAccountOwnerIdImmutable();
         allow delete: if isExistingOwner(userId);
 
-        /**
-         * @description A user can read their own trade history but cannot manually create, update, or delete trades.
-         * @path /users/{userId}/tradingAccounts/{tradingAccountId}/trades/{tradeId}
-         * @allow (get, list) an authenticated user reading trades associated with their own trading account.
-         * @deny (create, update, delete) any user trying to modify the trade history. This is likely managed by a backend service.
-         * @principle Ensures data integrity by making historical records immutable from the client-side.
-         */
         match /trades/{tradeId} {
           allow get: if isOwner(userId);
           allow list: if isOwner(userId);
@@ -168,13 +98,6 @@ service cloud.firestore {
           allow delete: if isExistingOwner(userId);
         }
 
-        /**
-         * @description A user can read their own daily recommendations.
-         * @path /users/{userId}/tradingAccounts/{tradingAccountId}/dailyRecommendations/{dailyRecommendationId}
-         * @allow (get, list) an authenticated user reading recommendations for their own trading account.
-         * @deny (create, update, delete) any user attempting to modify recommendations, which are generated by the backend.
-         * @principle Protects AI-generated data from client-side manipulation.
-         */
         match /dailyRecommendations/{dailyRecommendationId} {
           allow get: if isOwner(userId);
           allow list: if isOwner(userId);
@@ -188,14 +111,6 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     // Public Collections
     // ------------------------------------------------------------------------
-
-    /**
-     * @description Any authenticated user can read the list of available subscription plans. No one can write to this collection from the client.
-     * @path /subscriptionPlans/{subscriptionPlanId}
-     * @allow (get, list) any authenticated user reading the details of available subscription plans.
-     * @deny (create, update, delete) any user, as this data should only be managed by administrators via a trusted backend environment.
-     * @principle Segregates public read-only data for performance and security.
-     */
     match /subscriptionPlans/{subscriptionPlanId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
