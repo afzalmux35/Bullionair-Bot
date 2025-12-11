@@ -21,7 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DailyGoal, Trade } from '@/lib/types';
 import { useCollection, useFirestore, useUser, addDocumentNonBlocking } from '@/firebase';
-import { closeTrade, placeTrade } from '@/lib/brokerage-service';
+import { runTradingCycleFlow } from '@/ai/flows/trading-cycle-flow';
 
 import {
   TrendingUp,
@@ -37,54 +37,36 @@ import {
 import { useEffect, useState, useMemo } from 'react';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
-import type { BotActivity } from '@/lib/types';
+import type { BotActivity, TradingAccount } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 type LiveDashboardViewProps = {
   dailyGoal: DailyGoal;
-  confirmationMessage: string;
   onPause: () => void;
-  tradingAccountId: string;
+  tradingAccount: TradingAccount;
 };
 
-const tradeActions = [
-  "Analyzing market volatility...",
-  "Scanning for high-probability setups...",
-  "Trend confirmed. Looking for entry point.",
-  "Market is ranging. Waiting for a breakout.",
-  "Strong BUY signal detected. Confidence: 85%.",
-  "Strong SELL signal detected. Confidence: 88%.",
-  "Closing trade for a profit.",
-  "Stop loss hit. Closing trade.",
-  "Take profit target reached.",
-];
-
-const confidenceLevels = ["High", "Strong", "Moderate"];
-const volumes = [0.1, 0.2, 0.5, 1.0];
-
-function getRandomItem<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: LiveDashboardViewProps) {
-  const [nextAnalysisTime, setNextAnalysisTime] = useState(47);
+export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDashboardViewProps) {
+  const [nextAnalysisTime, setNextAnalysisTime] = useState(15);
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const tradesQuery = useMemoFirebase(() => {
-    if (!user || !tradingAccountId) return null;
+    if (!user || !tradingAccount) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccountId, 'trades'),
+      collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccount.id, 'trades'),
       orderBy('timestamp', 'desc')
     );
-  }, [firestore, user, tradingAccountId]);
+  }, [firestore, user, tradingAccount]);
 
   const { data: trades, isLoading: tradesLoading } = useCollection<Trade>(tradesQuery);
-  const openTrade = trades?.find(trade => trade.status === 'OPEN');
+  const openTrade = useMemo(() => trades?.find(trade => trade.status === 'OPEN'), [trades]);
 
   const botActivitiesCollection = useMemoFirebase(() => {
-    if(!user || !tradingAccountId) return null;
-    return collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccountId, 'botActivities');
-  }, [firestore, user, tradingAccountId]);
+    if(!user || !tradingAccount) return null;
+    return collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccount.id, 'botActivities');
+  }, [firestore, user, tradingAccount]);
 
   const botActivitiesQuery = useMemoFirebase(() => {
     if (!botActivitiesCollection) return null;
@@ -97,59 +79,51 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
 
   const { data: botActivities } = useCollection<BotActivity>(botActivitiesQuery);
 
-  // Trade simulation logic
+  // AI Trading Cycle
   useEffect(() => {
-    if (!firestore || !user || !tradingAccountId || !botActivitiesCollection) return;
+    if (!user || !tradingAccount || !firestore) return;
 
-    const simulateBotAction = async () => {
-      const action = getRandomItem(tradeActions);
+    let isCancelled = false;
 
-      const activity = {
-        id: '', // Firestore will generate
-        message: action,
-        timestamp: new Date().toISOString(),
-        type: action.includes('signal') ? 'SIGNAL' : (action.includes('Closing') ? 'RESULT' : 'ANALYSIS'),
-      };
-      addDocumentNonBlocking(botActivitiesCollection, activity);
-
-      // If there's an open trade, maybe close it
-      if (openTrade && Math.random() > 0.6) {
-        const profit = (Math.random() - 0.4) * 150; // Random profit/loss
-        const exitPrice = openTrade.entryPrice + (profit / openTrade.volume / 100);
-        closeTrade(firestore, user.uid, tradingAccountId, openTrade.id, exitPrice, profit);
-
-        const resultActivity = {
-            id: '',
-            message: `Trade closed. P/L: $${profit.toFixed(2)}`,
-            timestamp: new Date().toISOString(),
-            type: 'RESULT',
-        };
-        addDocumentNonBlocking(botActivitiesCollection, resultActivity);
-
-      } 
-      // If there's NO open trade, maybe open one
-      else if (!openTrade && (action.includes("BUY") || action.includes("SELL"))) {
-        const tradeType = action.includes("BUY") ? "BUY" : "SELL";
-        await placeTrade(firestore, user.uid, tradingAccountId, {
-          symbol: 'XAUUSD',
-          type: tradeType,
-          volume: getRandomItem(volumes),
-          entryPrice: 1950 + Math.random() * 10,
-          confidenceLevel: getRandomItem(confidenceLevels),
+    const runCycle = async () => {
+      try {
+        await runTradingCycleFlow({
+          tradingAccountId: tradingAccount.id,
+          user: { uid: user.uid },
+          account: {
+            currentBalance: tradingAccount.currentBalance,
+            dailyProfitTarget: tradingAccount.dailyProfitTarget,
+            dailyRiskLimit: tradingAccount.dailyRiskLimit,
+          },
+          openTrade: openTrade || null,
+        });
+      } catch (e: any) {
+        console.error("Trading cycle failed:", e);
+        toast({
+          variant: "destructive",
+          title: "Trading Cycle Error",
+          description: e.message || "The AI trading cycle encountered an error.",
         });
       }
+      
+      // Schedule next run
+      if (!isCancelled) {
+        setTimeout(runCycle, 15000); // Run every 15 seconds
+      }
     };
-
-    const simulationInterval = setInterval(simulateBotAction, 15000); // New action every 15s
     
-    return () => clearInterval(simulationInterval);
+    runCycle(); // Start the first cycle immediately
 
-  }, [firestore, user, tradingAccountId, openTrade, botActivitiesCollection]);
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, tradingAccount, firestore, openTrade, toast]);
+
 
   useEffect(() => {
     const timer = setInterval(() => {
       setNextAnalysisTime(prev => {
-        if (prev <= 1) return 60;
+        if (prev <= 1) return 15;
         return prev - 1;
       });
     }, 1000);
@@ -162,8 +136,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
   const losses = closedTrades.length - wins;
   const winRate = closedTrades.length > 0 ? (wins / closedTrades.length) * 100 : 0;
 
-  // Assuming starting balance comes from somewhere, for now, we'll estimate it.
-  const balance = 10000 + profit;
+  const balance = tradingAccount.startingBalance + profit;
   const profitPercentage = dailyGoal.type === 'profit' ? (profit / dailyGoal.value) * 100 : 0;
 
   const statCards = [
@@ -263,7 +236,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
                 <CircleDot className="mr-2 h-3 w-3 animate-pulse text-green-400" /> ACTIVE
               </Badge>
             </CardTitle>
-            <CardDescription>Since 8:00 AM</CardDescription>
+            <CardDescription>Since {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="flex items-center justify-between text-sm">
