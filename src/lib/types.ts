@@ -5,7 +5,7 @@ export type Trade = {
   symbol: string;
   type: 'BUY' | 'SELL';
   entryPrice: number;
-  exitPrice: number;
+  exitPrice?: number;
   volume: number;
   profit: number;
   confidenceLevel: string;

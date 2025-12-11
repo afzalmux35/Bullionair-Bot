@@ -31,7 +31,7 @@ import type { SuggestNextDayPositionSizeOutput } from '@/ai/flows/suggest-next-d
 import { useToast } from '@/hooks/use-toast';
 import { useMemoFirebase } from '@/firebase/provider';
 import { collection, query, where } from 'firebase/firestore';
-import type { DailySummary, TradingAccount } from '@/lib/types';
+import type { Trade, TradingAccount } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
 
 const suggestionFormSchema = z.object({
@@ -48,11 +48,18 @@ export function PerformanceReview() {
 
   const tradingAccountsQuery = useMemoFirebase(() => {
     if (!user) return null;
-    return query(collection(firestore, 'users', user.uid, 'tradingAccounts'), where('userProfileId', '==', user.uid));
+    return query(collection(firestore, 'users', user.uid, 'tradingAccounts'));
   }, [firestore, user]);
 
   const { data: tradingAccounts, isLoading: isLoadingAccounts } = useCollection<TradingAccount>(tradingAccountsQuery);
-  const performanceSummary = tradingAccounts?.[0] as DailySummary | undefined; // Assuming one for now
+  const tradingAccount = tradingAccounts?.[0];
+
+  const tradesQuery = useMemoFirebase(() => {
+    if(!user || !tradingAccount) return null;
+    return query(collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccount.id, 'trades'), where('status', '!=', 'OPEN'));
+  }, [firestore, user, tradingAccount]);
+
+  const { data: trades, isLoading: isLoadingTrades } = useCollection<Trade>(tradesQuery);
 
   const form = useForm<z.infer<typeof suggestionFormSchema>>({
     resolver: zodResolver(suggestionFormSchema),
@@ -63,11 +70,17 @@ export function PerformanceReview() {
     },
   });
 
+  const totalProfit = trades?.reduce((acc, trade) => acc + trade.profit, 0) || 0;
+  const winRate = trades && trades.length > 0 ? (trades.filter(t => t.profit > 0).length / trades.length) * 100 : 0;
+  const tradesTaken = trades?.length || 0;
+  const startingBalance = tradingAccount?.startingBalance || 10000;
+  const currentBalance = startingBalance + totalProfit;
+
   // Update form default value when data loads
-  if (performanceSummary && !form.getValues('previousTradingData')) {
+  if (trades && !form.getValues('previousTradingData')) {
     form.reset({
       ...form.getValues(),
-      previousTradingData: `Total Profit: $${performanceSummary.totalProfit}, Win Rate: ${performanceSummary.winRate}%, Trades: ${performanceSummary.tradesTaken}, Max Drawdown: $${performanceSummary.maxDrawdown}`,
+      previousTradingData: `Total Profit: $${totalProfit.toFixed(2)}, Win Rate: ${winRate.toFixed(1)}%, Trades: ${tradesTaken}`,
     });
   }
 
@@ -88,7 +101,7 @@ export function PerformanceReview() {
     }
   }
   
-  if (isLoadingAccounts) {
+  if (isLoadingAccounts || isLoadingTrades) {
     return (
         <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
             <Card>
@@ -118,14 +131,15 @@ export function PerformanceReview() {
     )
   }
 
-  const summaryData = performanceSummary ? [
-    { label: 'Starting Balance', value: `$${performanceSummary.startingBalance.toLocaleString()}` },
-    { label: 'Ending Balance', value: `$${performanceSummary.currentBalance.toLocaleString()}`, change: `+${((performanceSummary.currentBalance / performanceSummary.startingBalance * 100) - 100).toFixed(2)}%` },
-    { label: 'Total Profit', value: `$${(performanceSummary.currentBalance - performanceSummary.startingBalance).toLocaleString()}`, isPositive: true },
-    { label: 'Win Rate', value: `${performanceSummary.winRate || 0}%` },
-    { label: 'Trades Taken', value: performanceSummary.tradesTaken || 0 },
-    { label: 'Max Drawdown', value: `-$${Math.abs(performanceSummary.maxDrawdown || 0).toLocaleString()}`, isNegative: true },
-  ] : [];
+  const summaryData = [
+    { label: 'Starting Balance', value: `$${startingBalance.toLocaleString()}` },
+    { label: 'Ending Balance', value: `$${currentBalance.toLocaleString()}`, change: `+${((currentBalance / startingBalance * 100) - 100).toFixed(2)}%` },
+    { label: 'Total Profit', value: `$${totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, isPositive: totalProfit >= 0 },
+    { label: 'Win Rate', value: `${winRate.toFixed(1)}%` },
+    { label: 'Trades Taken', value: tradesTaken },
+    // Max drawdown would need a more complex calculation, so we'll omit it for now
+    // { label: 'Max Drawdown', value: `-$${Math.abs(performanceSummary.maxDrawdown || 0).toLocaleString()}`, isNegative: true },
+  ];
 
 
   return (
@@ -142,7 +156,7 @@ export function PerformanceReview() {
                 <TableRow key={item.label}>
                   <TableCell className="font-medium">{item.label}</TableCell>
                   <TableCell className="text-right">
-                    <span className={item.isPositive ? "text-green-400" : item.isNegative ? "text-red-400" : ""}>{item.value}</span>
+                    <span className={item.isPositive ? "text-green-400" : item.isPositive === false ? "text-red-400" : ""}>{item.value}</span>
                     {item.change && <span className="ml-2 text-xs text-muted-foreground">{item.change}</span>}
                   </TableCell>
                 </TableRow>

@@ -20,7 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DailyGoal, Trade } from '@/lib/types';
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser, addDocumentNonBlocking } from '@/firebase';
+import { closeTrade, placeTrade } from '@/lib/brokerage-service';
 
 import {
   TrendingUp,
@@ -33,8 +34,8 @@ import {
   CheckCircle2,
   Timer,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useEffect, useState, useMemo } from 'react';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
 import type { BotActivity } from '@/lib/types';
 
@@ -45,8 +46,27 @@ type LiveDashboardViewProps = {
   tradingAccountId: string;
 };
 
+const tradeActions = [
+  "Analyzing market volatility...",
+  "Scanning for high-probability setups...",
+  "Trend confirmed. Looking for entry point.",
+  "Market is ranging. Waiting for a breakout.",
+  "Strong BUY signal detected. Confidence: 85%.",
+  "Strong SELL signal detected. Confidence: 88%.",
+  "Closing trade for a profit.",
+  "Stop loss hit. Closing trade.",
+  "Take profit target reached.",
+];
+
+const confidenceLevels = ["High", "Strong", "Moderate"];
+const volumes = [0.1, 0.2, 0.5, 1.0];
+
+function getRandomItem<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: LiveDashboardViewProps) {
-  const [currentTime, setCurrentTime] = useState('00:47');
+  const [nextAnalysisTime, setNextAnalysisTime] = useState(47);
   const { user } = useUser();
   const firestore = useFirestore();
 
@@ -61,23 +81,77 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
   const { data: trades, isLoading: tradesLoading } = useCollection<Trade>(tradesQuery);
   const openTrade = trades?.find(trade => trade.status === 'OPEN');
 
+  const botActivitiesCollection = useMemoFirebase(() => {
+    if(!user || !tradingAccountId) return null;
+    return collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccountId, 'botActivities');
+  }, [firestore, user, tradingAccountId]);
+
   const botActivitiesQuery = useMemoFirebase(() => {
-    if (!user || !tradingAccountId) return null;
+    if (!botActivitiesCollection) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'tradingAccounts', tradingAccountId, 'botActivities'),
+      botActivitiesCollection,
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [firestore, user, tradingAccountId]);
+  }, [botActivitiesCollection]);
 
   const { data: botActivities } = useCollection<BotActivity>(botActivitiesQuery);
 
+  // Trade simulation logic
   useEffect(() => {
-    let seconds = 47;
+    if (!firestore || !user || !tradingAccountId || !botActivitiesCollection) return;
+
+    const simulateBotAction = async () => {
+      const action = getRandomItem(tradeActions);
+
+      const activity = {
+        id: '', // Firestore will generate
+        message: action,
+        timestamp: new Date().toISOString(),
+        type: action.includes('signal') ? 'SIGNAL' : (action.includes('Closing') ? 'RESULT' : 'ANALYSIS'),
+      };
+      addDocumentNonBlocking(botActivitiesCollection, activity);
+
+      // If there's an open trade, maybe close it
+      if (openTrade && Math.random() > 0.6) {
+        const profit = (Math.random() - 0.4) * 150; // Random profit/loss
+        const exitPrice = openTrade.entryPrice + (profit / openTrade.volume / 100);
+        closeTrade(firestore, user.uid, tradingAccountId, openTrade.id, exitPrice, profit);
+
+        const resultActivity = {
+            id: '',
+            message: `Trade closed. P/L: $${profit.toFixed(2)}`,
+            timestamp: new Date().toISOString(),
+            type: 'RESULT',
+        };
+        addDocumentNonBlocking(botActivitiesCollection, resultActivity);
+
+      } 
+      // If there's NO open trade, maybe open one
+      else if (!openTrade && (action.includes("BUY") || action.includes("SELL"))) {
+        const tradeType = action.includes("BUY") ? "BUY" : "SELL";
+        await placeTrade(firestore, user.uid, tradingAccountId, {
+          symbol: 'XAUUSD',
+          type: tradeType,
+          volume: getRandomItem(volumes),
+          entryPrice: 1950 + Math.random() * 10,
+          confidenceLevel: getRandomItem(confidenceLevels),
+        });
+      }
+    };
+
+    const simulationInterval = setInterval(simulateBotAction, 15000); // New action every 15s
+    
+    return () => clearInterval(simulationInterval);
+
+  }, [firestore, user, tradingAccountId, openTrade, botActivitiesCollection]);
+
+  useEffect(() => {
     const timer = setInterval(() => {
-      seconds--;
-      if (seconds < 0) seconds = 59;
-      setCurrentTime(`00:${seconds.toString().padStart(2, '0')}`);
+      setNextAnalysisTime(prev => {
+        if (prev <= 1) return 60;
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -100,7 +174,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
     },
     {
       title: "Today's P/L",
-      value: `${profit >= 0 ? '+' : ''}$${profit.toLocaleString('en-US')}`,
+      value: `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`,
       icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />,
     },
     {
@@ -130,7 +204,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
             </CardHeader>
             <CardContent>
               <div className="text-xs text-muted-foreground">
-                {dailyGoal.type === 'profit' ? `+${profit} (${profitPercentage.toFixed(0)}% achieved)` : `-$500 max risk`}
+                {dailyGoal.type === 'profit' ? `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)} (${profitPercentage.toFixed(0)}% achieved)` : `-$500 max risk`}
               </div>
             </CardContent>
             {dailyGoal.type === 'profit' && (
@@ -146,7 +220,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
                 {card.icon}
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{card.value}</div>
+                <div className={cn("text-2xl font-bold", card.title === "Today's P/L" && (profit > 0 ? "text-green-400" : profit < 0 ? "text-red-400" : ""))}>{card.value}</div>
               </CardContent>
             </Card>
           ))}
@@ -197,7 +271,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
                     <Timer className="h-4 w-4"/>
                     <span>Next analysis in:</span>
                 </div>
-                <span className="font-mono font-semibold">{currentTime}</span>
+                <span className="font-mono font-semibold">00:{String(nextAnalysisTime).padStart(2, '0')}</span>
             </div>
             <div className="flex gap-2">
                 <Button variant="outline" className="w-full" onClick={onPause}><PauseCircle className="mr-2"/> Pause Trading</Button>
@@ -214,32 +288,32 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccountId }: Live
             <CardContent className="grid gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/50 hover:bg-blue-500/30">⚡ {openTrade.type}</Badge>
+                  <Badge className={cn("hover:bg-blue-500/30", openTrade.type === 'BUY' ? "bg-blue-500/20 text-blue-300 border-blue-500/50" : "bg-red-500/20 text-red-300 border-red-500/50")}>⚡ {openTrade.type}</Badge>
                   <span className="font-semibold">{openTrade.volume} lots @ ${openTrade.entryPrice}</span>
                 </div>
                 <span className={cn(
                   "font-bold",
                   (openTrade.profit || 0) > 0 ? "text-green-400" : "text-red-400"
                 )}>
-                  {(openTrade.profit || 0) > 0 ? '+' : ''}${openTrade.profit}
+                  {/* Realtime P/L would go here */}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-sm">
                   <div>
                       <p className="text-muted-foreground">Risk</p>
-                      <p className="font-mono text-red-400">$-{/* Risk calculation needed */}</p>
+                      <p className="font-mono text-red-400">$-{((openTrade.entryPrice - (openTrade.entryPrice * 0.995)) * openTrade.volume * 100).toFixed(2)}</p>
                   </div>
                    <div>
                       <p className="text-muted-foreground">Stop Loss</p>
-                      <p className="font-mono">${openTrade.exitPrice /* Assuming exit price for now */}</p>
+                      <p className="font-mono">${(openTrade.entryPrice * 0.995).toFixed(2)}</p>
                   </div>
                   <div>
                       <p className="text-muted-foreground">Take Profit</p>
-                      <p className="font-mono text-green-400">${openTrade.exitPrice /* Assuming exit price for now */}</p>
+                      <p className="font-mono text-green-400">${(openTrade.entryPrice * 1.01).toFixed(2)}</p>
                   </div>
               </div>
               <div className="text-xs text-muted-foreground text-center">
-                Running: 15 min | Confidence: {openTrade.confidenceLevel}
+                Running: {Math.floor((new Date().getTime() - new Date(openTrade.timestamp).getTime()) / 60000)} min | Confidence: {openTrade.confidenceLevel}
               </div>
             </CardContent>
           </Card>
