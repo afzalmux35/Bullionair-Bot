@@ -60,13 +60,13 @@ export async function placeTrade(
   }
 ): Promise<string> {
     // In a real scenario, you would first call the FxApi here to open the position.
-    // const brokerageResponse = await fetch(`${FXAPI_BASE_URL}/trade`, {
-    //   method: 'POST',
-    //   headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ instrument: tradeDetails.symbol, units: tradeDetails.volume, side: tradeDetails.type })
-    // });
-    // if (!brokerageResponse.ok) throw new Error('Failed to place trade with brokerage.');
-    // const brokerageTrade = await brokerageResponse.json();
+    const brokerageResponse = await fetch(`${FXAPI_BASE_URL}/trade`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instrument: tradeDetails.symbol, units: tradeDetails.volume, side: tradeDetails.type })
+    });
+    if (!brokerageResponse.ok) throw new Error('Failed to place trade with brokerage.');
+    const brokerageTrade = await brokerageResponse.json();
     
     // For now, we immediately write to Firestore as before.
     const tradesCollection = collection(firestore, 'users', userId, 'tradingAccounts', tradingAccountId, 'trades');
@@ -91,7 +91,7 @@ export async function placeTrade(
  * Closes an existing trade using FxApi.
  * It updates the trade's status and profit in Firestore.
  */
-export function closeTrade(
+export async function closeTrade(
     firestore: Firestore,
     userId: string,
     tradingAccountId: string,
@@ -100,7 +100,9 @@ export function closeTrade(
     profit: number
 ) {
     // In a real scenario, you would call FxApi to close the position.
-    // await fetch(`${FXAPI_BASE_URL}/trade/${trade.brokerageId}/close`, { method: 'PUT', ... });
+    const tradeDoc = doc(firestore, 'users', userId, 'tradingAccounts', tradingAccountId, 'trades', tradeId);
+    // Presuming you have a brokerageId stored on the trade document.
+    // await fetch(`${FXAPI_BASE_URL}/trade/${trade.brokerageId}/close`, { method: 'PUT', headers: { 'Authorization': `Bearer ${API_KEY}` } });
     
     const tradeRef = doc(firestore, 'users', userId, 'tradingAccounts', tradingAccountId, 'trades', tradeId);
     
