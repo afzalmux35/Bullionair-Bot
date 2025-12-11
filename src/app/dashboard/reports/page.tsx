@@ -18,8 +18,8 @@ import {
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/firebase/provider';
 import type { Trade, TradingAccount } from '@/lib/types';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import { TrendingUp, TrendingDown, ArrowRight, Minus } from 'lucide-react';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { ArrowRight } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -84,8 +84,6 @@ export default function ReportsPage() {
         tradingAccount.id,
         'trades'
       ),
-      where('status', '!=', 'OPEN'),
-      orderBy('status'),
       orderBy('timestamp', 'asc')
     );
   }, [firestore, user, tradingAccount]);
@@ -122,7 +120,7 @@ export default function ReportsPage() {
   }
 
   const startingBalance = tradingAccount?.startingBalance || 10000;
-  const closedTrades = trades || [];
+  const closedTrades = trades?.filter(trade => trade.status !== 'OPEN') || [];
   const totalProfit = closedTrades.reduce(
     (acc, trade) => acc + (trade.profit || 0),
     0
