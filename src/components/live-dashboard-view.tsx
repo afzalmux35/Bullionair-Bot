@@ -35,6 +35,7 @@ import {
   Timer,
   Target,
   Shield,
+  Activity,
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
@@ -47,6 +48,20 @@ type LiveDashboardViewProps = {
   onPause: () => void;
   tradingAccount: TradingAccount;
 };
+
+const StatCard = ({ title, value, icon, isProfit = false, profitValue = 0 }: { title: string, value: string, icon: React.ReactNode, isProfit?: boolean, profitValue?: number }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            {icon}
+        </CardHeader>
+        <CardContent>
+            <div className={cn("text-2xl font-bold", isProfit && (profitValue > 0 ? "text-green-400" : profitValue < 0 ? "text-red-400" : ""))}>
+                {value}
+            </div>
+        </CardContent>
+    </Card>
+);
 
 export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDashboardViewProps) {
   const [nextAnalysisTime, setNextAnalysisTime] = useState(15);
@@ -125,7 +140,10 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
   useEffect(() => {
     const timer = setInterval(() => {
       setNextAnalysisTime(prev => {
-        if (prev <= 1) return 15;
+        if (prev <= 1) {
+            // This is where you might trigger the analysis refresh
+            return 15;
+        }
         return prev - 1;
       });
     }, 1000);
@@ -151,6 +169,8 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
       title: "Today's P/L",
       value: `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`,
       icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />,
+      isProfit: true,
+      profitValue: profit
     },
     {
       title: 'Win Rate',
@@ -165,58 +185,60 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
   ];
 
   return (
-    <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-      <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>
-                {dailyGoal.type === 'profit' ? "Today's Goal" : "Risk Limit"}
-              </CardDescription>
-              <CardTitle className="text-4xl font-bold">
-                ${dailyGoal.value.toLocaleString()}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">
-                {dailyGoal.type === 'profit' ? `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)} (${profitPercentage.toFixed(0)}% achieved)` : `-$500 max risk`}
-              </div>
-            </CardContent>
-            {dailyGoal.type === 'profit' && (
-              <CardContent className="pt-0">
-                <Progress value={profitPercentage} aria-label={`${profitPercentage.toFixed(0)}% towards goal`} />
-              </CardContent>
-            )}
-          </Card>
-          {statCards.map((card) => (
-            <Card key={card.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                {card.icon}
-              </CardHeader>
-              <CardContent>
-                <div className={cn("text-2xl font-bold", card.title === "Today's P/L" && (profit > 0 ? "text-green-400" : profit < 0 ? "text-red-400" : ""))}>{card.value}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <Card>
+    <div className="grid gap-8">
+       {/* Top Row: Status and Goal */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="bg-green-500/20 text-green-300 border-green-500/50">
+                  <CircleDot className="mr-2 h-3 w-3 animate-pulse text-green-400" /> ACTIVE
+              </Badge>
+              <span>Auto-Trading Status</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={onPause}><PauseCircle className="mr-2 h-4 w-4"/> Pause Trading</Button>
+                <Button variant="ghost" size="icon"><Settings2 className="h-4 w-4"/></Button>
+            </div>
+          </CardTitle>
+          <CardDescription>Since {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} | Next analysis in: {String(nextAnalysisTime).padStart(2, '0')}s</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {dailyGoal.type === 'profit' ? <Target className="h-5 w-5"/> : <Shield className="h-5 w-5"/>}
+                    <span>{dailyGoal.type === 'profit' ? "Today's Goal" : "Risk Limit"}:</span>
+                    <span className="text-lg font-bold text-foreground">${dailyGoal.value.toLocaleString()}</span>
+                </div>
+                <div className="flex-grow">
+                    <Progress value={profitPercentage} aria-label={`${profitPercentage.toFixed(0)}% towards goal`} />
+                    <p className="text-xs text-muted-foreground text-right mt-1">{profit >= 0 ? '+' : ''}${profit.toFixed(2)} ({profitPercentage > 0 ? profitPercentage.toFixed(0) : 0}% achieved)</p>
+                </div>
+            </div>
+        </CardContent>
+      </Card>
+      
+      {/* Second Row: Key Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((card) => (
+          <StatCard key={card.title} {...card} />
+        ))}
+      </div>
+
+      {/* Third Row: Activity and Open Trade */}
+      <div className="grid gap-8 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Bot Activity Log</CardTitle>
+             <CardTitle className="font-headline flex items-center gap-2"><Activity className="h-5 w-5" /> Bot Activity Log</CardTitle>
+             <CardDescription>A real-time feed of the AI's analysis and actions.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-96 overflow-y-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Activity</TableHead>
-                  </TableRow>
-                </TableHeader>
                 <TableBody>
                   {botActivities?.map((activity) => (
                     <TableRow key={activity.id}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
+                      <TableCell className="w-[100px] font-mono text-sm text-muted-foreground">
                         {new Date(activity.timestamp).toLocaleTimeString()}
                       </TableCell>
                       <TableCell>{activity.message}</TableCell>
@@ -227,35 +249,8 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="grid auto-rows-max items-start gap-4 md:gap-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Auto-Trading Status</span>
-              <Badge variant="outline" className="bg-green-500/20 text-green-300 border-green-500/50">
-                <CircleDot className="mr-2 h-3 w-3 animate-pulse text-green-400" /> ACTIVE
-              </Badge>
-            </CardTitle>
-            <CardDescription>Since {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <Timer className="h-4 w-4"/>
-                    <span>Next analysis in:</span>
-                </div>
-                <span className="font-mono font-semibold">00:{String(nextAnalysisTime).padStart(2, '0')}</span>
-            </div>
-            <div className="flex gap-2">
-                <Button variant="outline" className="w-full" onClick={onPause}><PauseCircle className="mr-2"/> Pause Trading</Button>
-                <Button variant="ghost" size="icon"><Settings2 /></Button>
-                <Button variant="ghost" size="icon"><List /></Button>
-            </div>
-          </CardContent>
-        </Card>
-        {openTrade && (
+        
+        {openTrade ? (
           <Card>
             <CardHeader>
               <CardTitle>Open Trade</CardTitle>
@@ -266,21 +261,15 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
                   <Badge className={cn("hover:bg-blue-500/30", openTrade.type === 'BUY' ? "bg-blue-500/20 text-blue-300 border-blue-500/50" : "bg-red-500/20 text-red-300 border-red-500/50")}>⚡ {openTrade.type}</Badge>
                   <span className="font-semibold">{openTrade.volume} lots @ ${openTrade.entryPrice}</span>
                 </div>
-                <span className={cn(
-                  "font-bold",
-                  (openTrade.profit || 0) > 0 ? "text-green-400" : "text-red-400"
-                )}>
-                  {/* Realtime P/L would go here */}
-                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground text-center pt-2 border-t mt-2">
                   <div className="flex items-center gap-1">
                       <Shield className="h-3 w-3 text-red-400"/>
-                      <span>SL: ${openTrade.stopLoss?.toFixed(2) || 'N/A'}</span>
+                      <span>SL: ${openTrade.stopLoss?.toFixed(2)}</span>
                   </div>
                    <div className="flex items-center gap-1">
                       <Target className="h-3 w-3 text-green-400"/>
-                      <span>TP: ${openTrade.takeProfit?.toFixed(2) || 'N/A'}</span>
+                      <span>TP: ${openTrade.takeProfit?.toFixed(2)}</span>
                   </div>
               </div>
               <div className="text-xs text-muted-foreground text-center">
@@ -288,6 +277,16 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
               </div>
             </CardContent>
           </Card>
+        ) : (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Open Trade</CardTitle>
+                </CardHeader>
+                <CardContent className="flex h-48 flex-col items-center justify-center text-center">
+                    <p className="text-muted-foreground">No open positions.</p>
+                    <p className="text-sm text-muted-foreground/80 mt-2">The bot is currently waiting for a high-probability setup.</p>
+                </CardContent>
+            </Card>
         )}
       </div>
     </div>
