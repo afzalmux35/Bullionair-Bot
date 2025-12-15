@@ -7,12 +7,26 @@
 import { ai } from '@/ai/genkit';
 import { tradingDecisionFlow } from './trading-decision-flow';
 import type { TradingDecisionInput } from '@/lib/types';
-import { Firestore, collection, doc } from 'firebase/firestore';
+import { Firestore, collection, doc, initializeApp, getFirestore } from 'firebase/firestore';
 import { getMarketData, placeTrade, closeTrade } from '@/lib/brokerage-service';
 import { addDocumentNonBlocking } from '@/firebase';
 import { z } from 'zod';
 
-async function logActivity(firestore: Firestore, tradingAccountId: string, userId: string, message: string, type: 'ANALYSIS' | 'SIGNAL' | 'RESULT' | 'UPDATE' = 'ANALYSIS') {
+// FIREBASE CONFIGURATION - ADD THIS
+const firebaseConfig = {
+  apiKey: "AIzaSyCvI2yX51W2zw3ZPIED4P_e0U-nkMBv2Do",
+  authDomain: "studio-2185229754-5b692.firebaseapp.com",
+  projectId: "studio-2185229754-5b692",
+  storageBucket: "studio-2185229754-5b692.firebasestorage.app",
+  messagingSenderId: "872571014730",
+  appId: "1:872571014730:web:aa91f023f259d2374220b3"
+};
+
+// Initialize Firebase app
+const app = initializeApp(firebaseConfig);
+const firestore = getFirestore(app);
+
+async function logActivity(tradingAccountId: string, userId: string, message: string, type: 'ANALYSIS' | 'SIGNAL' | 'RESULT' | 'UPDATE' = 'ANALYSIS') {
     const activitiesCollection = collection(firestore, 'users', userId, 'tradingAccounts', tradingAccountId, 'botActivities');
     const activityRef = doc(activitiesCollection);
     addDocumentNonBlocking(activityRef, {
@@ -23,9 +37,9 @@ async function logActivity(firestore: Firestore, tradingAccountId: string, userI
     });
 }
 
-// Create a new input schema that includes firestore
+// UPDATED INPUT SCHEMA - REMOVE firestore from here
 const RunTradingCycleInputSchema = z.object({
-  firestore: z.any(), // Firestore instance passed from client
+  // REMOVED: firestore: z.any(), // No longer needed
   tradingAccountId: z.string(),
   user: z.object({
     uid: z.string(),
@@ -48,11 +62,11 @@ export const runTradingCycleFlow = ai.defineFlow(
     outputSchema: z.void(),
   },
   async (input: RunTradingCycleInput) => {
-    // Get firestore from input (passed from client component)
-    const { firestore, tradingAccountId, user, openTrade, account } = input;
+    // Get parameters from input (firestore is now module-level)
+    const { tradingAccountId, user, openTrade, account } = input;
     
     // 1. Log that we are starting the analysis
-    await logActivity(firestore, tradingAccountId, user.uid, 'Analyzing market data and account status...');
+    await logActivity(tradingAccountId, user.uid, 'Analyzing market data and account status...');
 
     // Prepare input for tradingDecisionFlow
     const decisionInput = {
@@ -67,7 +81,7 @@ export const runTradingCycleFlow = ai.defineFlow(
     const { decision, reasoning, tradeDetails } = decisionResult;
 
     // 3. Log the AI's reasoning
-    await logActivity(firestore, tradingAccountId, user.uid, `AI Decision: ${decision}. Reasoning: ${reasoning}`, 'SIGNAL');
+    await logActivity(tradingAccountId, user.uid, `AI Decision: ${decision}. Reasoning: ${reasoning}`, 'SIGNAL');
 
     // 4. Execute the decision
     switch (decision) {
@@ -84,9 +98,9 @@ export const runTradingCycleFlow = ai.defineFlow(
             stopLoss: tradeDetails.stopLoss,
             takeProfit: tradeDetails.takeProfit,
           });
-          await logActivity(firestore, tradingAccountId, user.uid, `EXECUTION: Placed ${decision} order for ${tradeDetails.volume} lots. SL: ${tradeDetails.stopLoss}, TP: ${tradeDetails.takeProfit}`, 'RESULT');
+          await logActivity(tradingAccountId, user.uid, `EXECUTION: Placed ${decision} order for ${tradeDetails.volume} lots. SL: ${tradeDetails.stopLoss}, TP: ${tradeDetails.takeProfit}`, 'RESULT');
         } else {
-            await logActivity(firestore, tradingAccountId, user.uid, `WARNING: AI decided to open but provided no details.`, 'UPDATE');
+            await logActivity(tradingAccountId, user.uid, `WARNING: AI decided to open but provided no details.`, 'UPDATE');
         }
         break;
 
@@ -95,9 +109,9 @@ export const runTradingCycleFlow = ai.defineFlow(
           const marketData = await getMarketData();
           const profit = (marketData.price - openTrade.entryPrice) * (openTrade.type === 'SELL' ? -1 : 1) * openTrade.volume * 100;
           await closeTrade(firestore, user.uid, tradingAccountId, openTrade, marketData.price, profit);
-          await logActivity(firestore, tradingAccountId, user.uid, `EXECUTION: Closed trade for P/L: $${profit.toFixed(2)}`, 'RESULT');
+          await logActivity(tradingAccountId, user.uid, `EXECUTION: Closed trade for P/L: $${profit.toFixed(2)}`, 'RESULT');
         } else {
-            await logActivity(firestore, tradingAccountId, user.uid, `WARNING: AI decided to close but there was no open trade.`, 'UPDATE');
+            await logActivity(tradingAccountId, user.uid, `WARNING: AI decided to close but there was no open trade.`, 'UPDATE');
         }
         break;
 
