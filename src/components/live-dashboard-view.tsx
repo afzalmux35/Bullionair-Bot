@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DailyGoal, Trade } from '@/lib/types';
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useUser } from '@/firebase';
 import { runTradingCycleFlow } from '@/ai/flows/trading-cycle-flow';
 
 import {
@@ -66,7 +66,7 @@ const StatCard = ({ title, value, icon, isProfit = false, profitValue = 0 }: { t
 export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDashboardViewProps) {
   const [nextAnalysisTime, setNextAnalysisTime] = useState(15);
   const { user } = useUser();
-  const firestore = useFirestore();
+  const { firestore } = useUser(); // Get firestore from useUser hook
   const { toast } = useToast();
 
   const tradesQuery = useMemoFirebase(() => {
@@ -105,14 +105,17 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
     const runCycle = async () => {
       try {
         await runTradingCycleFlow({
+          firestore, // ← ADD THIS: Pass firestore instance
           tradingAccountId: tradingAccount.id,
-          user: { uid: user.uid },
+          user: { 
+            uid: user.uid,
+            email: user.email || '' // Add email if available
+          },
           account: {
-            currentBalance: tradingAccount.currentBalance,
             dailyProfitTarget: tradingAccount.dailyProfitTarget,
             dailyRiskLimit: tradingAccount.dailyRiskLimit,
           },
-          openTrade: openTrade || null,
+          openTrade: openTrade || undefined, // Use undefined instead of null
         });
       } catch (e: any) {
         console.error("Trading cycle failed:", e);
