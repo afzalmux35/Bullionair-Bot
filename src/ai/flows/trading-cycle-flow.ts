@@ -51,7 +51,7 @@ export const runTradingCycleFlow = ai.defineFlow(
         if (tradeDetails && tradeDetails.volume && tradeDetails.confidenceLevel) {
           const marketData = await getMarketData();
           await placeTrade(firestore, user.uid, tradingAccountId, {
-            symbol: 'XAUUSD',
+            symbol: 'XAUUSDm',
             type: decision === 'OPEN_BUY' ? 'BUY' : 'SELL',
             volume: tradeDetails.volume,
             entryPrice: marketData.price,
