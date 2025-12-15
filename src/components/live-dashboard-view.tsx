@@ -105,7 +105,6 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
     const runCycle = async () => {
       try {
         await runTradingCycleFlow({
-          firestore, // ← ADD THIS: Pass firestore instance
           tradingAccountId: tradingAccount.id,
           user: { 
             uid: user.uid,
