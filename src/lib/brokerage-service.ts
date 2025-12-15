@@ -18,7 +18,7 @@ const FXAPI_DATA_URL = 'https://api.fxapi.com/v1';
 const API_KEY = "fxa_live_eafS87WotvTRRcyImLduqpdAWNXttUIxYmrLDkbM"; 
 
 // The local address where your MT5 Bridge / Expert Advisor would be listening for commands.
-const MT5_BRIDGE_URL = 'http://localhost:8000';
+const MT5_BRIDGE_URL = 'https://afzalmux35.pythonanywhere.com/trade';
 
 
 /**
