@@ -4,7 +4,7 @@ import { getAuth, Auth } from 'firebase/auth';
 
 // Your Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCvI2yX51WZzw3ZPIED4P_e0U-nkMBv2Do",
+  apiKey: "AIzaSyCvI2yX51W2zw3ZPIED4P_e0U-nkMBv2Do",
   authDomain: "studio-2185229754-5b692.firebaseapp.com",
   databaseURL: "https://studio-2185229754-5b692-default-rtdb.firebaseio.com",
   projectId: "studio-2185229754-5b692",
