@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react'; // Add useMemo here
 import { DailyConfigForm } from '@/components/daily-config-form';
 import { LiveDashboardView } from '@/components/live-dashboard-view';
 import { PerformanceReview } from '@/components/performance-review';
@@ -8,29 +8,24 @@ import type { DailyGoal, TradingAccount } from '@/lib/types';
 import { Separator } from './ui/separator';
 import { useCollection, useFirestore, useUser, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-// Try one of these:
-import { useMemoFirebase } from '@/firebase'; // If exported in index.ts
-// OR
-import { useMemoFirebase } from '@/firebase/provider'; // Direct import
 import { Skeleton } from './ui/skeleton';
 
 export function DashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   
-  // FIXED: Proper collection reference
-  const tradingAccountsQuery = useMemoFirebase(() => {
+  // REPLACE useMemoFirebase with regular useMemo
+  const tradingAccountsQuery = useMemo(() => {
     if (!user || !firestore) return null;
     
     try {
-      // Correct way to create collection reference
       const collectionRef = collection(firestore, 'users', user.uid, 'tradingAccounts');
       return query(collectionRef, where('userProfileId', '==', user.uid));
     } catch (error) {
       console.error('Error creating query:', error);
       return null;
     }
-  }, [firestore, user]);
+  }, [firestore, user]); // Remove useMemoFirebase dependency
 
   const { data: tradingAccounts, isLoading: isLoadingAccounts } = useCollection<TradingAccount>(tradingAccountsQuery);
 
@@ -49,7 +44,6 @@ export function DashboardPage() {
         });
       }
       
-      // If trading is active on load, ensure the view reflects that
       if (activeAccount.autoTradingActive) {
         setTradingActive(true);
       }
