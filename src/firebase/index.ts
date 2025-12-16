@@ -1,3 +1,5 @@
+// src/firebase/index.ts
+
 // Re-export everything from initialize
 export { initializeFirebase, getSdks } from './initialize';
 
@@ -15,3 +17,6 @@ export {
 
 // Re-export core Firebase instances
 export { app, firestore, auth } from './config';
+
+// ⚠️ IMPORTANT: Export useMemoFirebase
+export { useMemoFirebase } from './provider';
