@@ -13,7 +13,7 @@ export async function sendTradeSignalToBridge(signal: {
     console.log('📤 [Signal Sender] Sending to bridge:', signal);
     
     // IMPORTANT: Use your local bridge URL
-    const BRIDGE_URL = 'http://localhost:8000';
+    const BRIDGE_URL = 'https://poignant-tiddly-wilbert.ngrok-free.dev -> http://localhost:8000  ';
     
     const response = await fetch(`${BRIDGE_URL}/trade`, {
       method: 'POST',
