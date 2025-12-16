@@ -8,7 +8,10 @@ import type { DailyGoal, TradingAccount } from '@/lib/types';
 import { Separator } from './ui/separator';
 import { useCollection, useFirestore, useUser, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { useMemoFirebase } from '@/firebase/provider';
+// Try one of these:
+import { useMemoFirebase } from '@/firebase'; // If exported in index.ts
+// OR
+import { useMemoFirebase } from '@/firebase/provider'; // Direct import
 import { Skeleton } from './ui/skeleton';
 
 export function DashboardPage() {
