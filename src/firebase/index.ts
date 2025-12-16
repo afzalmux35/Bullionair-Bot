@@ -1,24 +1,17 @@
+// Re-export everything from initialize
+export { initializeFirebase, getSdks } from './initialize';
+
 // Re-export everything from provider
 export * from './provider';
 export * from './client-provider';
 
-// Core Firebase services
-export { app, firestore, auth, getSdks } from './config';
-
-// Hook exports for backward compatibility
-export { 
-  useFirebase, 
-  useAuth, 
-  useFirestore, 
-  useFirebaseApp, 
-  useUser,
-  useMemoFirebase 
-} from './provider';
-
-// Firestore hooks (you need to create these)
+// Re-export Firestore hooks
 export { 
   useCollection, 
   useDoc, 
   setDocumentNonBlocking, 
   updateDocumentNonBlocking 
 } from './firestore-hooks';
+
+// Re-export core Firebase instances
+export { app, firestore, auth } from './config';
