@@ -1,4 +1,4 @@
-const tradesQuery = useMemoFirebase(() => {
+const tradesQuery = useMemo(() => {
   if (!user || !tradingAccount || !firestore) return null;
   
   try {
@@ -12,7 +12,7 @@ const tradesQuery = useMemoFirebase(() => {
   }
 }, [firestore, user, tradingAccount]);
 
-const botActivitiesCollection = useMemoFirebase(() => {
+const botActivitiesCollection = useMemo(() => {
   if (!user || !tradingAccount || !firestore) return null;
   
   try {
