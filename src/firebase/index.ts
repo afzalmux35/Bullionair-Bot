@@ -1,13 +1,25 @@
 // src/firebase/index.ts
+// SIMPLIFIED VERSION - EXPORTS EVERYTHING YOU NEED
 
-// Re-export everything from initialize
-export { initializeFirebase, getSdks } from './initialize';
+// Core Firebase services
+export { app, firestore, auth, getSdks } from './config';
 
-// Re-export everything from provider
-export * from './provider';
-export * from './client-provider';
+// Firebase initialization
+export { initializeFirebase } from './initialize';
 
-// Re-export Firestore hooks
+// React Context Provider
+export { FirebaseClientProvider } from './client-provider';
+
+// React Hooks from provider
+export { 
+  useFirebase,
+  useAuth,
+  useFirestore,
+  useFirebaseApp,
+  useUser
+} from './provider';
+
+// Firestore data hooks
 export { 
   useCollection, 
   useDoc, 
@@ -15,8 +27,5 @@ export {
   updateDocumentNonBlocking 
 } from './firestore-hooks';
 
-// Re-export core Firebase instances
-export { app, firestore, auth } from './config';
-
-// ⚠️ IMPORTANT: Export useMemoFirebase
-export { useMemoFirebase } from './provider';
+// For backward compatibility - re-export everything from provider
+export * from './provider';
