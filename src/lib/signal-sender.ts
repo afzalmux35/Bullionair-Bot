@@ -74,15 +74,16 @@ export async function testBridgeConnection() {
 
 /**
  * Generate random trade signal for testing
+ * REMOVED: Not needed in server action
  */
-export function generateRandomSignal() {
-  const actions = ['BUY', 'SELL'] as const;
-  const action = actions[Math.floor(Math.random() * actions.length)];
-  
-  return {
-    symbol: 'XAUUSDm',
-    action: action,
-    volume: 0.01, // Start small
-    comment: `Bullionair-Bot ${action} signal`
-  };
-}
+// export function generateRandomSignal() {
+//   const actions = ['BUY', 'SELL'] as const;
+//   const action = actions[Math.floor(Math.random() * actions.length)];
+//   
+//   return {
+//     symbol: 'XAUUSDm',
+//     action: action,
+//     volume: 0.01,
+//     comment: `Bullionair-Bot ${action} signal`
+//   };
+// }
