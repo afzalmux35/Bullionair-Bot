@@ -12,8 +12,8 @@ export async function sendTradeSignalToBridge(signal: {
   try {
     console.log('📤 [Signal Sender] Sending to bridge:', signal);
     
-    // IMPORTANT: Use your local bridge URL
-    const BRIDGE_URL = 'https://poignant-tiddly-wilbert.ngrok-free.dev -> http://localhost:8000  ';
+    // Use ngrok URL
+    const BRIDGE_URL = process.env.NEXT_PUBLIC_BRIDGE_URL || 'https://poignant-tiddly-wilbert.ngrok-free.dev';
     
     const response = await fetch(`${BRIDGE_URL}/trade`, {
       method: 'POST',
@@ -24,13 +24,18 @@ export async function sendTradeSignalToBridge(signal: {
     });
     
     if (!response.ok) {
-      throw new Error(`Bridge responded with status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Bridge responded with ${response.status}: ${errorText}`);
     }
     
     const result = await response.json();
     console.log('✅ [Signal Sender] Bridge response:', result);
     
-    return result;
+    return {
+      status: 'success',
+      data: result,
+      message: 'Trade sent successfully'
+    };
     
   } catch (error: any) {
     console.error('❌ [Signal Sender] Error:', error.message);
@@ -47,10 +52,12 @@ export async function sendTradeSignalToBridge(signal: {
  */
 export async function testBridgeConnection() {
   try {
-    const response = await fetch('http://localhost:8000/health');
+    const BRIDGE_URL = process.env.NEXT_PUBLIC_BRIDGE_URL || 'https://poignant-tiddly-wilbert.ngrok-free.dev';
+    const response = await fetch(`${BRIDGE_URL}/health`);
     
     if (!response.ok) {
-      throw new Error(`Health check failed: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Health check failed: ${response.status}: ${errorText}`);
     }
     
     const data = await response.json();
@@ -58,7 +65,7 @@ export async function testBridgeConnection() {
     
     return {
       status: 'success',
-      data,
+      data: data,
       message: 'Bridge connection successful'
     };
     
@@ -71,19 +78,3 @@ export async function testBridgeConnection() {
     };
   }
 }
-
-/**
- * Generate random trade signal for testing
- * REMOVED: Not needed in server action
- */
-// export function generateRandomSignal() {
-//   const actions = ['BUY', 'SELL'] as const;
-//   const action = actions[Math.floor(Math.random() * actions.length)];
-//   
-//   return {
-//     symbol: 'XAUUSDm',
-//     action: action,
-//     volume: 0.01,
-//     comment: `Bullionair-Bot ${action} signal`
-//   };
-// }
