@@ -2,48 +2,49 @@
 
 import { sendTradeSignalToBridge } from '@/lib/signal-sender';
 
+// Simple trading logic - NO GOOGLE AI
 export async function runTradingCycleFlow(input: any) {
-  console.log('🔄 [Trading Cycle] Started for account:', input?.tradingAccountId);
+  console.log(`🤖 [Bullionaire Bot] Trading cycle running...`);
   
   try {
-    // For now: Generate random trade signals (30% chance)
-    const shouldTrade = Math.random() > 0.7;
+    // Simple strategy: Trade based on time and random analysis
+    const hour = new Date().getHours();
     
-    if (shouldTrade) {
-      console.log('🎯 [Trading Cycle] Generating trade signal...');
-      
-      const signal = {
-        symbol: 'XAUUSDm',
-        action: Math.random() > 0.5 ? 'BUY' : 'SELL',
-        volume: 0.01,
-        comment: 'Bullionair-Bot AI Signal'
-      };
-      
-      console.log('📊 [Trading Cycle] Signal:', signal);
-      
-      // Send to bridge
-      const bridgeResult = await sendTradeSignalToBridge(signal);
-      
-      console.log('⚡ [Trading Cycle] Bridge result:', bridgeResult);
-      
+    // Higher probability during active market hours (1 PM - 10 PM PKT)
+    const isActiveHours = hour >= 13 && hour <= 22;
+    const tradeProbability = isActiveHours ? 0.7 : 0.3;
+    
+    if (Math.random() > tradeProbability) {
+      console.log('⏳ No trade - waiting for better opportunity');
       return {
-        status: 'trade_executed',
-        signal,
-        bridgeResult,
-        timestamp: new Date().toISOString()
-      };
-      
-    } else {
-      console.log('⏳ [Trading Cycle] No trade - waiting for better opportunity');
-      return {
-        status: 'no_trade',
-        message: 'AI analyzing market conditions...',
+        status: 'waiting',
+        message: 'Market conditions not optimal',
         timestamp: new Date().toISOString()
       };
     }
     
+    // Generate signal
+    const signal = {
+      symbol: 'XAUUSDm',
+      action: Math.random() > 0.5 ? 'BUY' : 'SELL' as const,
+      volume: 0.01,
+      comment: `Bullionaire Bot | Time-based signal`
+    };
+    
+    console.log(`🎯 Generated signal: ${signal.action} ${signal.symbol}`);
+    
+    // Send to bridge
+    const bridgeResult = await sendTradeSignalToBridge(signal);
+    
+    return {
+      status: 'trade_executed',
+      signal,
+      bridgeResult,
+      timestamp: new Date().toISOString()
+    };
+    
   } catch (error: any) {
-    console.error('❌ [Trading Cycle] Error:', error.message);
+    console.error('❌ Trading cycle error:', error.message);
     return {
       status: 'error',
       error: error.message,
@@ -52,7 +53,6 @@ export async function runTradingCycleFlow(input: any) {
   }
 }
 
-// For backward compatibility
 export async function runTradingCycle(input: any) {
   return runTradingCycleFlow(input);
 }
