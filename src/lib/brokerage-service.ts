@@ -14,6 +14,15 @@ export type MarketData = {
   trend: 'UP' | 'DOWN' | 'SIDEWAYS';
 };
 
+// Represents full technical indicator data
+export type TechnicalIndicators = {
+  price: number;
+  ema9: number;
+  ema21: number;
+  rsi: number;
+  atr: number;
+}
+
 const FXAPI_DATA_URL = 'https://api.fxapi.com/v1';
 const API_KEY = "fxa_live_eafS87WotvTRRcyImLduqpdAWNXttUIxYmrLDkbM"; 
 
@@ -22,7 +31,39 @@ const MT5_BRIDGE_URL = 'http://localhost:8000';
 
 
 /**
+ * Simulates fetching and calculating live technical indicators.
+ * In a real application, this would involve a library like 'technicalindicators'
+ * and a history of price data. For now, we simulate realistic values.
+ */
+export async function getTechnicalIndicators(): Promise<TechnicalIndicators> {
+    // Simulate a base price and volatility
+    const basePrice = 1950 + Math.sin(Date.now() / 60000) * 20; // Oscillates over a minute
+    const volatility = Math.random() * 5;
+    const price = basePrice + (Math.random() - 0.5) * volatility;
+
+    // Simulate EMA crossover
+    const ema9 = basePrice + (Math.random() - 0.5) * (volatility / 2);
+    const ema21 = basePrice - (Math.random() - 0.5) * (volatility / 2);
+
+    // Simulate RSI
+    const rsi = 50 + (ema9 - ema21) * 5 + (Math.random() - 0.5) * 10; // Link RSI to crossover
+
+    // Simulate ATR
+    const atr = volatility * 1.5;
+
+    return {
+        price: parseFloat(price.toFixed(2)),
+        ema9: parseFloat(ema9.toFixed(2)),
+        ema21: parseFloat(ema21.toFixed(2)),
+        rsi: parseFloat(Math.max(0, Math.min(100, rsi)).toFixed(2)), // Clamp RSI between 0-100
+        atr: parseFloat(atr.toFixed(2)),
+    };
+}
+
+
+/**
  * Fetches live market data for gold (XAU/USD) from FxApi.
+ * This is now a legacy function, prefer getTechnicalIndicators for strategy.
  */
 export async function getMarketData(): Promise<MarketData> {
   try {

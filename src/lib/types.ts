@@ -37,7 +37,10 @@ export type TradingDecisionInput = z.infer<typeof TradingDecisionInputSchema>;
 export const TradingDecisionPromptInputSchema = TradingDecisionInputSchema.extend({
     marketData: z.object({
         price: z.number(),
-        trend: z.string(),
+        ema9: z.number(),
+        ema21: z.number(),
+        rsi: z.number(),
+        atr: z.number(),
     }),
     currentTime: z.string(),
 });

@@ -6,7 +6,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { getMarketData } from '@/lib/brokerage-service';
+import { getMarketData, getTechnicalIndicators } from '@/lib/brokerage-service';
 import { TradingDecisionInputSchema, TradingDecisionOutputSchema, TradingDecisionPromptInputSchema } from '@/lib/types';
 import type { TradingDecisionInput, TradingDecisionOutput } from '@/lib/types';
 
@@ -15,30 +15,50 @@ const decisionPrompt = ai.definePrompt({
     name: 'tradingDecisionPrompt',
     input: { schema: TradingDecisionPromptInputSchema },
     output: { schema: TradingDecisionOutputSchema },
-    prompt: `You are an expert AI trading bot for Gold (XAUUSD). It is currently {{currentTime}}.
+    prompt: `You are an expert AI trading bot for Gold (XAUUSD) following a "Momentum Crossover Strategy". It is currently {{currentTime}}.
 
     Your goal is to manage one trade at a time to hit a daily profit target of \${{account.dailyProfitTarget}} while not exceeding a daily risk limit of \${{account.dailyRiskLimit}}.
 
-    ## Current Market Data
-    - Price: \${{marketData.price}}
-    - 2-Minute Trend: {{marketData.trend}}
+    ## Strategy Rules (MUST FOLLOW)
+    1.  **Bullish Entry (OPEN_BUY):**
+        - The 9-period EMA MUST be above the 21-period EMA.
+        - The RSI(14) MUST be above 50 but below 70 (strong, but not overbought).
+        - There must be NO open trade.
+
+    2.  **Bearish Entry (OPEN_SELL):**
+        - The 9-period EMA MUST be below the 21-period EMA.
+        - The RSI(14) MUST be below 50 but above 30 (strong, but not oversold).
+        - There must be NO open trade.
+        
+    3.  **Exit Condition (CLOSE):**
+        - A trade is open AND the RSI(14) crosses back over 70 (for a BUY) or under 30 (for a SELL).
+        - OR the price hits the Take Profit or Stop Loss level.
+
+    4.  **Hold/Wait (WAIT):**
+        - If none of the above entry or exit conditions are met.
+
+    ## Live Market Analysis
+    - Current Price: \${{marketData.price}}
+    - 9-period EMA: \${{marketData.ema9}}
+    - 21-period EMA: \${{marketData.ema21}}
+    - RSI(14): {{marketData.rsi}}
+    - ATR(14) for Risk: \${{marketData.atr}}
 
     ## Current Account State
     - Today's P/L: \${{account.todaysPnL}}
     - Open Trade: {{#if openTrade}}A {{openTrade.type}} trade opened at \${{openTrade.entryPrice}} running for {{openTrade.durationMinutes}} minutes. Current unrealized P/L is \${{openTrade.unrealizedPnL}}.{{else}}None{{/if}}
 
     ## Your Task
-    Based on all the data, decide the SINGLE best action to take RIGHT NOW. Your options are:
-    1.  **OPEN_BUY**: If there's no open trade and you see a clear bullish setup.
-    2.  **OPEN_SELL**: If there's no open trade and you see a clear bearish setup.
-    3.  **CLOSE**: If the current open trade should be closed (either to take profit or cut losses).
-    4.  **WAIT**: If no clear opportunity exists or it's better to hold the current position.
-
-    Provide detailed reasoning based on the trend, price action, and risk management. If opening a trade, you MUST specify:
-    - volume: A sensible trade volume.
-    - confidenceLevel: Your confidence in this trade (e.g., "High", "Medium", "Low").
-    - stopLoss: A specific price level for the stop loss.
-    - takeProfit: A specific price level for the take profit.
+    Based STRICTLY on the rules above, decide the SINGLE best action to take: OPEN_BUY, OPEN_SELL, CLOSE, or WAIT.
+    
+    If opening a trade, you MUST calculate the Stop Loss and Take Profit using the ATR:
+    - **Stop Loss:**
+        - For BUY: Entry Price - (1.5 * ATR)
+        - For SELL: Entry Price + (1.5 * ATR)
+    - **Take Profit:**
+        - For BUY: Entry Price + (2.0 * ATR)
+        - For SELL: Entry Price - (2.0 * ATR)
+    - You must also specify a sensible trade volume and confidence level.
     `,
 });
 
@@ -50,7 +70,7 @@ export const tradingDecisionFlow = ai.defineFlow(
     outputSchema: TradingDecisionOutputSchema,
   },
   async (input): Promise<TradingDecisionOutput> => {
-    const marketData = await getMarketData();
+    const marketData = await getTechnicalIndicators();
 
     let openTradeWithContext = null;
     if (input.openTrade) {
