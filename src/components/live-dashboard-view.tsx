@@ -64,54 +64,11 @@ const StatCard = ({ title, value, icon, isProfit = false, profitValue = 0 }: {
   </Card>
 );
 
-// ... REST OF THE FILE REMAINS EXACTLY AS I PREVIOUSLY PROVIDED ...
-// Keep all the existing code from the previous fix below this line
-
-'use client';
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
-import type { DailyGoal, Trade } from '@/lib/types';
-import { useCollection, useFirestore, useUser } from '@/firebase';
-
-import {
-  TrendingUp,
-  CircleDot,
-  PauseCircle,
-  Settings2,
-  List,
-  DollarSign,
-  BarChart2,
-  CheckCircle2,
-  Timer,
-  Target,
-  Shield,
-  Activity,
-} from 'lucide-react';
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { useMemoFirebase } from '@/firebase/provider';
-import type { BotActivity, TradingAccount } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
-
-// ... keep existing StatCard component ...
+type LiveDashboardViewProps = {
+  dailyGoal: DailyGoal;
+  onPause: () => void;
+  tradingAccount: TradingAccount;
+};
 
 export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDashboardViewProps) {
   const [nextAnalysisTime, setNextAnalysisTime] = useState(15);
