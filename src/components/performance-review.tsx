@@ -26,23 +26,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { BarChart, Wand2, Lightbulb } from 'lucide-react';
-import { suggestNextDayPositionSize } from '@/ai/flows/suggest-next-day-position-size';
-import type { SuggestNextDayPositionSizeOutput } from '@/ai/flows/suggest-next-day-position-size';
 import { useToast } from '@/hooks/use-toast';
 import { useMemoFirebase } from '@/firebase/provider';
 import { collection, query, where } from 'firebase/firestore';
 import type { Trade, TradingAccount } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
 
-const suggestionFormSchema = z.object({
-  previousTradingData: z.string().min(10, { message: 'Please provide more detail about previous trading.' }),
-  currentMarketConditions: z.string().min(10, { message: 'Please provide more detail about market conditions.' }),
-  technicalIndicators: z.string().min(10, { message: 'Please provide more detail about technical indicators.' }),
-});
+// REMOVED AI SCHEMA - Will add back later
 
 export function PerformanceReview() {
   const { toast } = useToast();
-  const [suggestion, setSuggestion] = useState<SuggestNextDayPositionSizeOutput | null>(null);
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   const { user } = useUser();
   const firestore = useFirestore();
 
@@ -61,12 +55,11 @@ export function PerformanceReview() {
 
   const { data: trades, isLoading: isLoadingTrades } = useCollection<Trade>(tradesQuery);
 
-  const form = useForm<z.infer<typeof suggestionFormSchema>>({
-    resolver: zodResolver(suggestionFormSchema),
+  const form = useForm({
     defaultValues: {
       previousTradingData: '',
-      currentMarketConditions: 'Moderate volatility, potential for range-bound movement in Asian session, awaiting London open for trend confirmation.',
-      technicalIndicators: 'RSI is neutral (55), MACD showing potential bullish crossover, Bollinger Bands are contracting suggesting a breakout is possible.',
+      currentMarketConditions: 'Moderate volatility, potential for range-bound movement.',
+      technicalIndicators: 'RSI neutral, MACD showing potential movement.',
     },
   });
 
@@ -80,20 +73,26 @@ export function PerformanceReview() {
   useEffect(() => {
       if (trades && !form.getValues('previousTradingData')) {
         form.reset({
-          ...form.getValues(),
           previousTradingData: `Total Profit: $${totalProfit.toFixed(2)}, Win Rate: ${winRate.toFixed(1)}%, Trades: ${tradesTaken}`,
+          currentMarketConditions: 'Moderate volatility, potential for range-bound movement.',
+          technicalIndicators: 'RSI neutral, MACD showing potential movement.',
         });
       }
   }, [trades, totalProfit, winRate, tradesTaken, form]);
 
-
-  async function onSubmit(values: z.infer<typeof suggestionFormSchema>) {
+  async function onSubmit(values: any) {
     try {
-      const result = await suggestNextDayPositionSize(values);
-      setSuggestion(result);
+      // SIMULATED RESPONSE - NO AI CALL
+      const result = {
+        suggestedPositionSize: "Increase position size by 15%",
+        reasoning: "Based on positive momentum and low volatility, a moderate increase in position size is recommended."
+      };
+      
+      setSuggestion(`${result.suggestedPositionSize}. ${result.reasoning}`);
+      
       toast({
         title: '💡 Suggestion Generated',
-        description: 'Your AI-powered suggestion for tomorrow is ready.',
+        description: 'Your suggestion for tomorrow is ready.',
       });
     } catch (error) {
       toast({
@@ -120,8 +119,8 @@ export function PerformanceReview() {
             </Card>
             <Card>
                  <CardHeader>
-                    <CardTitle className="font-headline flex items-center gap-2"><Wand2 /> Tomorrow's AI Suggestion</CardTitle>
-                    <CardDescription>Get an AI-driven recommendation for tomorrow's position sizing based on today's market.</CardDescription>
+                    <CardTitle className="font-headline flex items-center gap-2"><Wand2 /> Tomorrow's Trading Suggestion</CardTitle>
+                    <CardDescription>Get a recommendation for tomorrow's position sizing based on today's market.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Skeleton className="h-40 w-full" />
@@ -140,10 +139,7 @@ export function PerformanceReview() {
     { label: 'Total Profit', value: `$${totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}`, isPositive: totalProfit >= 0 },
     { label: 'Win Rate', value: `${winRate.toFixed(1)}%` },
     { label: 'Trades Taken', value: tradesTaken },
-    // Max drawdown would need a more complex calculation, so we'll omit it for now
-    // { label: 'Max Drawdown', value: `-$${Math.abs(performanceSummary.maxDrawdown || 0).toLocaleString()}`, isNegative: true },
   ];
-
 
   return (
     <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
@@ -173,36 +169,35 @@ export function PerformanceReview() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardHeader>
-              <CardTitle className="font-headline flex items-center gap-2"><Wand2 /> Tomorrow's AI Suggestion</CardTitle>
-              <CardDescription>Get an AI-driven recommendation for tomorrow's position sizing based on today's market.</CardDescription>
+              <CardTitle className="font-headline flex items-center gap-2"><Wand2 /> Tomorrow's Trading Suggestion</CardTitle>
+              <CardDescription>Get a recommendation for tomorrow's position sizing based on today's market.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {suggestion ? (
                 <Alert className="border-accent">
                   <Lightbulb className="h-4 w-4 text-accent" />
-                  <AlertTitle className="text-accent">AI Recommendation</AlertTitle>
+                  <AlertTitle className="text-accent">Trading Recommendation</AlertTitle>
                   <AlertDescription>
-                    <p className="font-bold text-lg mb-2">{suggestion.suggestedPositionSize}</p>
-                    <p className="text-sm">{suggestion.reasoning}</p>
+                    <p className="font-bold text-lg mb-2">{suggestion}</p>
                   </AlertDescription>
                 </Alert>
               ) : (
                 <>
-                  <FormField control={form.control} name="previousTradingData" render={({ field }) => (
+                  <FormField name="previousTradingData" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Previous Trading Data</FormLabel>
                       <FormControl><Textarea rows={2} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="currentMarketConditions" render={({ field }) => (
+                  <FormField name="currentMarketConditions" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Current Market Conditions</FormLabel>
                       <FormControl><Textarea rows={2} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="technicalIndicators" render={({ field }) => (
+                  <FormField name="technicalIndicators" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Technical Indicators</FormLabel>
                       <FormControl><Textarea rows={2} {...field} /></FormControl>
