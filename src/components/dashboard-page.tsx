@@ -6,7 +6,7 @@ import { LiveDashboardView } from '@/components/live-dashboard-view';
 import { PerformanceReview } from '@/components/performance-review';
 import type { DailyGoal, TradingAccount } from '@/lib/types';
 import { Separator } from './ui/separator';
-import { useCollection, useFirestore, useUser, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
 import { Skeleton } from './ui/skeleton';
@@ -30,7 +30,11 @@ export function DashboardPage() {
     if (tradingAccounts && tradingAccounts.length > 0) {
       const activeAccount = tradingAccounts[0];
       setTradingAccount(activeAccount);
-      // Logic to auto-start trading is removed. User must initiate.
+      
+      // We will no longer automatically start trading. 
+      // The dashboard will always show the config form on load.
+      setIsTradingActive(false);
+
       if (!dailyGoal) {
         setDailyGoal({ type: 'profit', value: activeAccount.dailyProfitTarget || 1000 });
       }

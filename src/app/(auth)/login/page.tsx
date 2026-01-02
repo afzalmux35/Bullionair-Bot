@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth, useUser, useFirestore } from "@/firebase";
-import { initiateEmailSignIn } from "@/firebase/non-blocking-login";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -56,7 +55,6 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-        // Use the official signIn method, which we can await
         await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
         // The onAuthStateChanged listener will handle the redirect
     } catch (err: any) {
@@ -80,11 +78,10 @@ export default function LoginPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, signupEmail, signupPassword);
       const newUser = userCredential.user;
       
-      // Now that user is created, create their data in Firestore
       await createInitialUserData(firestore, newUser, signupFirstName, signupLastName);
       
       toast({ title: "Welcome!", description: "Your account and trading profile have been created." });
-      // The onAuthStateChanged listener will handle the redirect
+      // The onAuthStateChanged listener will handle the redirect, no need to push here.
     } catch (err: any) {
       setError(err.message);
       toast({ variant: "destructive", title: "Sign Up Failed", description: err.message });
