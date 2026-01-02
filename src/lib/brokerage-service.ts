@@ -25,11 +25,11 @@ export type TechnicalIndicators = {
 }
 
 const FXAPI_BASE_URL = 'https://api.fxapi.com/v1';
-// API KEY is now read from server-side environment variables, not here.
 
 async function getHistoricalData(symbol: string, interval: string, count: number): Promise<any[]> {
     const url = `${FXAPI_BASE_URL}/timeseries?symbol=${symbol}&interval=${interval}&count=${count}&apikey=${process.env.FXAPI_KEY}`;
-    const response = await fetch(url, { cache: 'no-store' }); // Ensure fresh data
+    // Force dynamic fetching to prevent caching issues on Vercel server components
+    const response = await fetch(url, { next: { revalidate: 0 } });
     if (!response.ok) {
         const errorText = await response.text();
         console.error(`Failed to fetch historical data from FxApi: ${response.statusText}`, errorText);
