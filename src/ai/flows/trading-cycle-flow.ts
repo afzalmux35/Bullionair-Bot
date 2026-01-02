@@ -7,20 +7,15 @@
 import { ai } from '@/ai/genkit';
 import { tradingDecisionFlow } from './trading-decision-flow';
 import type { TradingDecisionInput } from '@/lib/types';
-import { Firestore, collection, doc } from 'firebase/firestore';
+import { Firestore, collection, doc, setDoc } from 'firebase/firestore';
 import { getTechnicalIndicators, placeTradeInFirestore, closeTradeInFirestore } from '@/lib/brokerage-service';
 import { initializeServerFirebase } from '@/firebase/server-init';
 import { z } from 'zod';
 import { sendTradeCommand } from '@/lib/command-queue';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-
 
 async function logActivity(firestore: Firestore, tradingAccountId: string, userId: string, message: string, type: 'ANALYSIS' | 'SIGNAL' | 'RESULT' | 'UPDATE' = 'ANALYSIS') {
     const activitiesCollection = collection(firestore, 'users', userId, 'tradingAccounts', tradingAccountId, 'botActivities');
     const activityRef = doc(activitiesCollection);
-    // Note: This function is on the server, but it's calling a non-blocking firestore write.
-    // This is fine, but for consistency we can use the direct SDK here.
-    // Using setDoc directly as this is a server-side operation.
     await setDoc(activityRef, {
         id: activityRef.id,
         message,
