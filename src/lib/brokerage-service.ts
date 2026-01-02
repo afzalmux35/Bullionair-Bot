@@ -26,7 +26,7 @@ export type TechnicalIndicators = {
 }
 
 const FXAPI_BASE_URL = 'https://api.fxapi.com/v1';
-const API_KEY = "fxa_live_eafS87WotvTRRcyImLduqpdAWNXttUIxYmrLDkbM"; 
+const API_KEY = process.env.FXAPI_KEY; 
 
 // The local address where your MT5 Bridge / Expert Advisor would be listening for commands.
 const MT5_BRIDGE_URL = 'http://localhost:8000';
@@ -47,6 +47,9 @@ async function getHistoricalData(symbol: string, interval: string, count: number
  */
 export async function getTechnicalIndicators(): Promise<TechnicalIndicators> {
     try {
+        if (!API_KEY) {
+            throw new Error("FXAPI_KEY is not defined in environment variables.");
+        }
         // Fetch the last 100 1-minute candles to have enough data for calculations
         const historicalData = await getHistoricalData('XAUUSD', '1m', 100);
 
