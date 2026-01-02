@@ -1,70 +1,56 @@
-'use client';
-
-import {
-  Firestore,
-  doc,
-  setDoc,
-  collection,
-  writeBatch,
-} from 'firebase/firestore';
+import { Firestore, doc, setDoc } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
-function generateReferralCode(length: number): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-export const createInitialUserData = async (
+export async function createInitialUserData(
   firestore: Firestore,
   user: User,
   firstName: string,
   lastName: string
-) => {
-  const userProfileRef = doc(firestore, 'users', user.uid);
-  const userProfileData = {
-    id: user.uid,
-    email: user.email,
-    firstName: firstName,
-    lastName: lastName,
-    referralCode: generateReferralCode(8),
-  };
-  
-  const tradingAccountRef = doc(collection(userProfileRef, 'tradingAccounts'));
-  const tradingAccountData = {
-    id: tradingAccountRef.id,
-    userProfileId: user.uid,
-    startingBalance: 10000,
-    currentBalance: 10000,
-    dailyRiskLimit: 500,
-    dailyProfitTarget: 1000,
-    autoTradingActive: false, // Explicitly ensure trading is NOT active for new users.
-  };
-
-  const batch = writeBatch(firestore);
-
-  batch.set(userProfileRef, userProfileData, { merge: true });
-  batch.set(tradingAccountRef, tradingAccountData, { merge: true });
-  
-  const activitiesCollection = collection(tradingAccountRef, 'botActivities');
-
-  const initialActivities = [
-    { message: 'Welcome to Bullionaire Bot! Your account is set up.', type: 'UPDATE' },
-    { message: 'Navigate to the dashboard to configure your first auto-trading session.', type: 'UPDATE' }
-  ];
-
-  initialActivities.forEach(activity => {
-    const activityRef = doc(activitiesCollection);
-    batch.set(activityRef, { 
-      ...activity,
-      timestamp: new Date().toISOString(),
-      id: activityRef.id
+): Promise<void> {
+  try {
+    // Create user profile
+    const userProfileRef = doc(firestore, 'users', user.uid);
+    
+    const referralCode = generateReferralCode();
+    
+    await setDoc(userProfileRef, {
+      id: user.uid,
+      email: user.email,
+      firstName,
+      lastName,
+      referralCode,
+      virtualBalance: 10000, // Starting demo balance
+      createdAt: new Date().toISOString(),
     });
-  });
+    
+    // Create default trading account
+    const tradingAccountsCollection = collection(firestore, 'users', user.uid, 'tradingAccounts');
+    const tradingAccountRef = doc(tradingAccountsCollection);
+    
+    await setDoc(tradingAccountRef, {
+      id: tradingAccountRef.id,
+      userProfileId: user.uid,
+      startingBalance: 10000,
+      currentBalance: 10000,
+      dailyRiskLimit: 500,
+      dailyProfitTarget: 1000,
+      maxPositionSize: 1.0,
+      autoTradingActive: false,
+      createdAt: new Date().toISOString(),
+    });
+    
+    console.log(`✅ User data created for: ${user.email}`);
+  } catch (error) {
+    console.error('❌ Failed to create user data:', error);
+    throw error;
+  }
+}
 
-  // Commit all writes together as a single atomic operation.
-  await batch.commit();
-};
+function generateReferralCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `REF-${result}`;
+}
