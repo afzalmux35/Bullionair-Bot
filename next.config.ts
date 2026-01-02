@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['technicalindicators'],
   },
+  // This ensures environment variables are available on the server
+  env: {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    FXAPI_KEY: process.env.FXAPI_KEY,
+  }
 };
 
 export default nextConfig;
