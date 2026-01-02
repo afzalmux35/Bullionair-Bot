@@ -1,3 +1,4 @@
+import { runSimpleTradingCycle } from '@/lib/simple-trading-bot';
 'use client';
 
 import {
