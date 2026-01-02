@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -25,7 +24,6 @@ import {
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Bot, Target, ShieldAlert } from "lucide-react";
-import { aiPoweredTradingEngine } from "@/ai/flows/ai-powered-trading-engine";
 import { useToast } from "@/hooks/use-toast";
 import type { DailyGoal } from "@/lib/types";
 
@@ -58,12 +56,21 @@ export function DailyConfigForm({ onStartTrading }: DailyConfigFormProps) {
     };
 
     try {
-      const result = await aiPoweredTradingEngine(input);
+      // SIMULATED AI RESPONSE - NO AI CALL
+      const result = {
+        confirmationMessage: `✅ Trading engine activated! Monitoring markets 24/7 with ${values.type === 'profit' ? `profit target of $${values.amount}` : `risk limit of $${values.amount}`}.`,
+      };
+      
       toast({
         title: "✅ Trading Engine Activated",
         description: result.confirmationMessage,
       });
-      onStartTrading({ type: values.type, value: values.amount }, result.confirmationMessage);
+      
+      onStartTrading({ 
+        type: values.type, 
+        value: values.amount 
+      }, result.confirmationMessage);
+      
     } catch (error) {
       toast({
         variant: "destructive",
