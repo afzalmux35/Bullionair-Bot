@@ -21,6 +21,75 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DailyGoal, Trade } from '@/lib/types';
 import { useCollection, useFirestore, useUser } from '@/firebase';
+import {
+  TrendingUp,
+  CircleDot,
+  PauseCircle,
+  Settings2,
+  DollarSign,
+  BarChart2,
+  CheckCircle2,
+  Timer,
+  Target,
+  Shield,
+  Activity,
+} from 'lucide-react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useMemoFirebase } from '@/firebase/provider';
+import type { BotActivity, TradingAccount } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+
+// ADD THIS MISSING COMPONENT
+const StatCard = ({ title, value, icon, isProfit = false, profitValue = 0 }: { 
+  title: string, 
+  value: string, 
+  icon: React.ReactNode, 
+  isProfit?: boolean, 
+  profitValue?: number 
+}) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      {icon}
+    </CardHeader>
+    <CardContent>
+      <div className={cn(
+        "text-2xl font-bold", 
+        isProfit && (profitValue > 0 ? "text-green-400" : profitValue < 0 ? "text-red-400" : "")
+      )}>
+        {value}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+// ... REST OF THE FILE REMAINS EXACTLY AS I PREVIOUSLY PROVIDED ...
+// Keep all the existing code from the previous fix below this line
+
+'use client';
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
+import type { DailyGoal, Trade } from '@/lib/types';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 
 import {
   TrendingUp,
