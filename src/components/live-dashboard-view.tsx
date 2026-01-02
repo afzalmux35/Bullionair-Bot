@@ -1,6 +1,6 @@
-import { runSimpleTradingCycle } from '@/lib/simple-trading-bot';
 'use client';
 
+import { runSimpleTradingCycle } from '@/lib/simple-trading-bot';
 import {
   Card,
   CardContent,
@@ -41,7 +41,7 @@ import { useMemoFirebase } from '@/firebase/provider';
 import type { BotActivity, TradingAccount } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
-// ADD THIS MISSING COMPONENT
+// StatCard component
 const StatCard = ({ title, value, icon, isProfit = false, profitValue = 0 }: { 
   title: string, 
   value: string, 
@@ -72,7 +72,7 @@ type LiveDashboardViewProps = {
 };
 
 export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDashboardViewProps) {
-  const [nextAnalysisTime, setNextAnalysisTime] = useState(15);
+  const [nextAnalysisTime, setNextAnalysisTime] = useState(30); // Changed to 30 seconds
   const [unrealizedPL, setUnrealizedPL] = useState<number | null>(null);
   const { user } = useUser();
   const firestore = useFirestore();
@@ -101,53 +101,52 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
 
   const { data: botActivities } = useCollection<BotActivity>(botActivitiesQuery);
 
-  // REMOVED AI TRADING CYCLE - Will add back later
   // Simple trading cycle (every 30 seconds when active)
-useEffect(() => {
-  if (!tradingAccount?.autoTradingActive) {
-    // Don't run if auto-trading is not active
-    return;
-  }
-
-  const runCycle = async () => {
-    if (!firestore || !user || !tradingAccount) return;
-
-    try {
-      await runSimpleTradingCycle(
-        firestore,
-        user.uid,
-        tradingAccount.id,
-        tradingAccount,
-        openTrade || null
-      );
-    } catch (error: any) {
-      console.error("Trading cycle failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Trading Cycle Error",
-        description: error.message || "The trading cycle encountered an error.",
-      });
+  useEffect(() => {
+    if (!tradingAccount?.autoTradingActive) {
+      // Don't run if auto-trading is not active
+      return;
     }
-  };
 
-  // Run first cycle immediately
-  runCycle();
-  
-  // Set up interval for subsequent cycles (every 30 seconds)
-  const cycleInterval = setInterval(runCycle, 30000);
-  
-  return () => {
-    clearInterval(cycleInterval);
-  };
-}, [tradingAccount?.autoTradingActive, firestore, user, tradingAccount, openTrade, toast]);
+    const runCycle = async () => {
+      if (!firestore || !user || !tradingAccount) return;
 
-// Timer for UI countdown (keep this separate)
-useEffect(() => {
-  const countdownTimer = setInterval(() => {
-    setNextAnalysisTime(prev => (prev <= 1 ? 30 : prev - 1)); // Changed to 30 seconds
-  }, 1000);
-  return () => clearInterval(countdownTimer);
-}, []);
+      try {
+        await runSimpleTradingCycle(
+          firestore,
+          user.uid,
+          tradingAccount.id,
+          tradingAccount,
+          openTrade || null
+        );
+      } catch (error: any) {
+        console.error("Trading cycle failed:", error);
+        toast({
+          variant: "destructive",
+          title: "Trading Cycle Error",
+          description: error.message || "The trading cycle encountered an error.",
+        });
+      }
+    };
+
+    // Run first cycle immediately
+    runCycle();
+    
+    // Set up interval for subsequent cycles (every 30 seconds)
+    const cycleInterval = setInterval(runCycle, 30000);
+    
+    return () => {
+      clearInterval(cycleInterval);
+    };
+  }, [tradingAccount?.autoTradingActive, firestore, user, tradingAccount, openTrade, toast]);
+
+  // Timer for UI countdown
+  useEffect(() => {
+    const countdownTimer = setInterval(() => {
+      setNextAnalysisTime(prev => (prev <= 1 ? 30 : prev - 1));
+    }, 1000);
+    return () => clearInterval(countdownTimer);
+  }, []);
 
   // Auto-scroll activity log
   useEffect(() => {
