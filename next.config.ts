@@ -30,10 +30,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  env: {
-    FXAPI_KEY: process.env.FXAPI_KEY,
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  }
+  experimental: {
+    serverComponentsExternalPackages: ['technicalindicators'],
+  },
 };
 
 export default nextConfig;

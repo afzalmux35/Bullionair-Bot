@@ -32,6 +32,9 @@ const API_KEY = process.env.FXAPI_KEY;
 const MT5_BRIDGE_URL = 'http://localhost:8000';
 
 async function getHistoricalData(symbol: string, interval: string, count: number): Promise<any[]> {
+    if (!API_KEY) {
+        throw new Error("FXAPI_KEY environment variable not set on the server.");
+    }
     const url = `${FXAPI_BASE_URL}/timeseries?symbol=${symbol}&interval=${interval}&count=${count}&api_key=${API_KEY}`;
     const response = await fetch(url, { cache: 'no-store' }); // Ensure fresh data
     if (!response.ok) {
@@ -47,9 +50,6 @@ async function getHistoricalData(symbol: string, interval: string, count: number
  */
 export async function getTechnicalIndicators(): Promise<TechnicalIndicators> {
     try {
-        if (!API_KEY) {
-            throw new Error("FXAPI_KEY is not defined in environment variables.");
-        }
         // Fetch the last 100 1-minute candles to have enough data for calculations
         const historicalData = await getHistoricalData('XAUUSD', '1m', 100);
 
