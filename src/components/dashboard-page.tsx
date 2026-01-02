@@ -31,10 +31,9 @@ export function DashboardPage() {
       const activeAccount = tradingAccounts[0];
       setTradingAccount(activeAccount);
       
-      // We will no longer automatically start trading. 
-      // The dashboard will always show the config form on load.
-      setIsTradingActive(false);
-
+      // Check if auto-trading is already active
+      setIsTradingActive(activeAccount.autoTradingActive || false);
+      
       if (!dailyGoal) {
         setDailyGoal({ type: 'profit', value: activeAccount.dailyProfitTarget || 1000 });
       }
@@ -44,22 +43,39 @@ export function DashboardPage() {
   const handleStartTrading = (goal: DailyGoal, confirmation: string) => {
     if (!user || !tradingAccount) return;
     const accountRef = doc(firestore, 'users', user.uid, 'tradingAccounts', tradingAccount.id);
-    const updateData = {
-        autoTradingActive: true,
-        dailyProfitTarget: goal.type === 'profit' ? goal.value : tradingAccount.dailyProfitTarget,
-        dailyRiskLimit: goal.type === 'risk' ? goal.value : tradingAccount.dailyRiskLimit,
-    };
-    updateDocumentNonBlocking(accountRef, updateData);
-    setTradingAccount(prev => prev ? { ...prev, ...updateData } : undefined);
+    
+    // Update Firestore
+    updateDocumentNonBlocking(accountRef, {
+      autoTradingActive: true,
+      dailyProfitTarget: goal.type === 'profit' ? goal.value : tradingAccount.dailyProfitTarget,
+      dailyRiskLimit: goal.type === 'risk' ? goal.value : tradingAccount.dailyRiskLimit,
+    });
+    
+    // Update local state IMMEDIATELY
+    setTradingAccount(prev => prev ? { 
+      ...prev, 
+      autoTradingActive: true,
+      dailyProfitTarget: goal.type === 'profit' ? goal.value : prev.dailyProfitTarget,
+      dailyRiskLimit: goal.type === 'risk' ? goal.value : prev.dailyRiskLimit,
+    } : undefined);
+    
     setDailyGoal(goal);
-    setIsTradingActive(true); 
+    setIsTradingActive(true); // THIS LINE WAS MISSING
   };
   
   const handlePauseTrading = () => {
     if (!user || !tradingAccount) return;
     const accountRef = doc(firestore, 'users', user.uid, 'tradingAccounts', tradingAccount.id);
-    updateDocumentNonBlocking(accountRef, { autoTradingActive: false });
-    setTradingAccount(prev => prev ? { ...prev, autoTradingActive: false } : undefined);
+    
+    updateDocumentNonBlocking(accountRef, { 
+      autoTradingActive: false 
+    });
+    
+    setTradingAccount(prev => prev ? { 
+      ...prev, 
+      autoTradingActive: false 
+    } : undefined);
+    
     setIsTradingActive(false);
   };
 
@@ -72,7 +88,11 @@ export function DashboardPage() {
       {!isTradingActive ? (
         <DailyConfigForm onStartTrading={handleStartTrading} />
       ) : (
-        tradingAccount && dailyGoal && <LiveDashboardView dailyGoal={dailyGoal} onPause={handlePauseTrading} tradingAccount={tradingAccount} />
+        tradingAccount && dailyGoal && <LiveDashboardView 
+          dailyGoal={dailyGoal} 
+          onPause={handlePauseTrading} 
+          tradingAccount={tradingAccount} 
+        />
       )}
       <Separator />
       <PerformanceReview />
