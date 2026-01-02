@@ -21,7 +21,6 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DailyGoal, Trade } from '@/lib/types';
 import { useCollection, useFirestore, useUser } from '@/firebase';
-import { runTradingCycleFlow } from '@/ai/flows/trading-cycle-flow';
 
 import {
   TrendingUp,
@@ -37,32 +36,13 @@ import {
   Shield,
   Activity,
 } from 'lucide-react';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
 import type { BotActivity, TradingAccount } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { getTechnicalIndicators } from '@/lib/brokerage-service';
 
-type LiveDashboardViewProps = {
-  dailyGoal: DailyGoal;
-  onPause: () => void;
-  tradingAccount: TradingAccount;
-};
-
-const StatCard = ({ title, value, icon, isProfit = false, profitValue = 0 }: { title: string, value: string, icon: React.ReactNode, isProfit?: boolean, profitValue?: number }) => (
-    <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            {icon}
-        </CardHeader>
-        <CardContent>
-            <div className={cn("text-2xl font-bold", isProfit && (profitValue > 0 ? "text-green-400" : profitValue < 0 ? "text-red-400" : ""))}>
-                {value}
-            </div>
-        </CardContent>
-    </Card>
-);
+// ... keep existing StatCard component ...
 
 export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDashboardViewProps) {
   const [nextAnalysisTime, setNextAnalysisTime] = useState(15);
@@ -70,6 +50,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const activityLogRef = useRef<HTMLDivElement>(null);
 
   const tradesQuery = useMemoFirebase(() => {
     if (!firestore || !user || !tradingAccount) return null;
@@ -93,70 +74,20 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
 
   const { data: botActivities } = useCollection<BotActivity>(botActivitiesQuery);
 
-  // AI Trading Cycle
+  // REMOVED AI TRADING CYCLE - Will add back later
   useEffect(() => {
-    if (!user || !tradingAccount || !firestore) return;
-
-    let isCancelled = false;
-    
-    const openTradeFromState = trades?.find(trade => trade.status === 'OPEN');
-
-    const runCycle = async () => {
-      try {
-        await runTradingCycleFlow({
-          tradingAccountId: tradingAccount.id,
-          user: { uid: user.uid },
-          account: {
-            currentBalance: tradingAccount.currentBalance,
-            dailyProfitTarget: tradingAccount.dailyProfitTarget,
-            dailyRiskLimit: tradingAccount.dailyRiskLimit,
-          },
-          openTrade: openTradeFromState || null,
-        });
-
-        // After the flow runs, if there's an open trade, calculate its live P/L
-        if (openTradeFromState) {
-            const marketData = await getTechnicalIndicators();
-            const pnl = (marketData.price - openTradeFromState.entryPrice) * (openTradeFromState.type === 'SELL' ? -1 : 1) * openTradeFromState.volume * 100;
-            setUnrealizedPL(pnl);
-        } else {
-            setUnrealizedPL(null); // No open trade, no P/L
-        }
-
-      } catch (e: any) {
-        console.error("Trading cycle failed:", e);
-        toast({
-          variant: "destructive",
-          title: "Trading Cycle Error",
-          description: e.message || "The AI trading cycle encountered an error.",
-        });
-      }
-      
-      // Schedule next run
-      if (!isCancelled) {
-        setTimeout(runCycle, 15000); // Run every 15 seconds
-      }
-    };
-    
-    runCycle(); // Start the first cycle immediately
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [user, tradingAccount, firestore, trades, toast]);
-
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNextAnalysisTime(prev => {
-        if (prev <= 1) {
-            return 15;
-        }
-        return prev - 1;
-      });
+    const countdownTimer = setInterval(() => {
+      setNextAnalysisTime(prev => (prev <= 1 ? 15 : prev - 1));
     }, 1000);
-    return () => clearInterval(timer);
+    return () => clearInterval(countdownTimer);
   }, []);
+
+  // Auto-scroll activity log
+  useEffect(() => {
+      if (activityLogRef.current) {
+          activityLogRef.current.scrollTop = activityLogRef.current.scrollHeight;
+      }
+  }, [botActivities]);
 
   const closedTrades = trades?.filter(trade => trade.status !== 'OPEN') || [];
   const profit = closedTrades.reduce((acc, trade) => acc + (trade.profit || 0), 0);
@@ -241,7 +172,7 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
              <CardDescription>A real-time feed of the AI's analysis and actions.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-96 overflow-y-auto">
+            <div className="h-96 overflow-y-auto" ref={activityLogRef}>
               <Table>
                 <TableBody>
                   {botActivities?.map((activity) => (
