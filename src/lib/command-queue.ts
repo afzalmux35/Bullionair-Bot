@@ -1,46 +1,39 @@
+import { Firestore, collection, doc, setDoc } from 'firebase/firestore';
 
-'use server';
-import { Firestore, doc, setDoc } from "firebase/firestore";
-import { setDocumentNonBlocking } from "@/firebase";
-
-const COMMAND_DOC_PATH = 'bullionaire-bot-commands/trade-command';
-
-export type TradeCommand = {
-    action: 'OPEN' | 'CLOSE';
-    timestamp: number;
-    details: {
-        symbol?: string;
-        volume?: number;
-        type?: 'BUY' | 'SELL';
-        stopLoss?: number;
-        takeProfit?: number;
-        firestoreTradeId: string; // Used as the primary key to link back to our DB
-    };
-};
-
-/**
- * Sends a trade command to the Firestore command queue.
- * The MT5 bridge should be listening to this document for changes.
- */
-export async function sendTradeCommand(firestore: Firestore, command: Omit<TradeCommand, 'timestamp'>) {
-    const commandRef = doc(firestore, COMMAND_DOC_PATH);
-    const commandWithTimestamp: TradeCommand = {
-        ...command,
-        timestamp: Date.now(),
-    };
-    
-    // Use a non-blocking write. The server doesn't need to wait for this to complete.
-    setDocumentNonBlocking(commandRef, commandWithTimestamp, { merge: false });
-    console.log(`Command sent to Firestore queue: ${command.action} for trade ${command.details.firestoreTradeId}`);
+export interface TradeCommand {
+  action: 'OPEN' | 'CLOSE' | 'MODIFY';
+  details: {
+    symbol?: string;
+    volume?: number;
+    type?: 'BUY' | 'SELL';
+    stopLoss?: number;
+    takeProfit?: number;
+    firestoreTradeId?: string;
+    [key: string]: any;
+  };
+  timestamp?: string;
+  status?: 'PENDING' | 'EXECUTED' | 'FAILED';
 }
 
-/**
- * Deletes the command from the queue.
- * The MT5 bridge should call this after successfully executing a command.
- */
-export async function clearTradeCommand(firestore: Firestore) {
-    const commandRef = doc(firestore, COMMAND_DOC_PATH);
-    // Overwrite with an empty object to clear it
-    await setDoc(commandRef, {});
-    console.log('Trade command cleared from queue.');
+export async function sendTradeCommand(
+  firestore: Firestore,
+  command: TradeCommand
+): Promise<string> {
+  try {
+    const commandsCollection = collection(firestore, 'tradeCommands');
+    const commandRef = doc(commandsCollection);
+    
+    const fullCommand = {
+      ...command,
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+    };
+    
+    await setDoc(commandRef, fullCommand);
+    console.log(`✅ Trade command sent: ${command.action}`, command.details);
+    return commandRef.id;
+  } catch (error) {
+    console.error('❌ Failed to send trade command:', error);
+    throw error;
+  }
 }
