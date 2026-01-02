@@ -102,12 +102,52 @@ export function LiveDashboardView({ dailyGoal, onPause, tradingAccount }: LiveDa
   const { data: botActivities } = useCollection<BotActivity>(botActivitiesQuery);
 
   // REMOVED AI TRADING CYCLE - Will add back later
-  useEffect(() => {
-    const countdownTimer = setInterval(() => {
-      setNextAnalysisTime(prev => (prev <= 1 ? 15 : prev - 1));
-    }, 1000);
-    return () => clearInterval(countdownTimer);
-  }, []);
+  // Simple trading cycle (every 30 seconds when active)
+useEffect(() => {
+  if (!tradingAccount?.autoTradingActive) {
+    // Don't run if auto-trading is not active
+    return;
+  }
+
+  const runCycle = async () => {
+    if (!firestore || !user || !tradingAccount) return;
+
+    try {
+      await runSimpleTradingCycle(
+        firestore,
+        user.uid,
+        tradingAccount.id,
+        tradingAccount,
+        openTrade || null
+      );
+    } catch (error: any) {
+      console.error("Trading cycle failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Trading Cycle Error",
+        description: error.message || "The trading cycle encountered an error.",
+      });
+    }
+  };
+
+  // Run first cycle immediately
+  runCycle();
+  
+  // Set up interval for subsequent cycles (every 30 seconds)
+  const cycleInterval = setInterval(runCycle, 30000);
+  
+  return () => {
+    clearInterval(cycleInterval);
+  };
+}, [tradingAccount?.autoTradingActive, firestore, user, tradingAccount, openTrade, toast]);
+
+// Timer for UI countdown (keep this separate)
+useEffect(() => {
+  const countdownTimer = setInterval(() => {
+    setNextAnalysisTime(prev => (prev <= 1 ? 30 : prev - 1)); // Changed to 30 seconds
+  }, 1000);
+  return () => clearInterval(countdownTimer);
+}, []);
 
   // Auto-scroll activity log
   useEffect(() => {
