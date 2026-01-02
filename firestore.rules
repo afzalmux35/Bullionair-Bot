@@ -109,7 +109,10 @@ service cloud.firestore {
         }
       }
     }
-
+match /tradeCommands/{commandId} {
+  allow create: if isSignedIn();
+  allow read, update, delete: if false; // Only bridge should read/update
+}
     // ------------------------------------------------------------------------
     // Public Collections
     // ------------------------------------------------------------------------
